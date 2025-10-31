@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title>Admin - System Toggle</title>
+	<link rel="stylesheet" href="../style.css" />
+	<style>
+		body{font-family:system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:20px;background:#f6f8fb}
+		.panel{max-width:720px;margin:20px auto;background:#fff;padding:16px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+		header{display:flex;align-items:center;justify-content:space-between}
+		.controls{display:flex;gap:12px;align-items:center}
+		button{padding:10px 14px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer}
+		button.primary{background:#2b7cff;color:#fff;border:0}
+		.status{font-weight:600}
+		.meta{color:#556;font-size:13px;margin-top:8px}
+		.danger{background:#ff4d4f;color:#fff;border:0}
+	</style>
+</head>
+<body>
+	<div class="panel">
+		<header>
+			<h1>System On / Off Toggle</h1>
+			<div class="controls">
+				<div id="statusLabel" class="status">Loading...</div>
+			</div>
+		</header>
+
+		<p class="meta">Use this page to turn the whole system on or off by updating the Realtime Database key <code>/system/enabled</code>. Protect this page — it does not enforce authentication by itself.</p>
+
+		<div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+			<input id="changedBy" placeholder="Your name (for audit)" style="padding:8px;border:1px solid #ccc;border-radius:6px" />
+			<button id="toggleBtn" class="primary">Toggle</button>
+			<button id="forceOffBtn" class="danger">Force OFF</button>
+		</div>
+
+		<div id="metaInfo" class="meta"></div>
+	</div>
+
+	<script type="module">
+		import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
+		import { getDatabase, ref, onValue, update } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
+
+		// Firebase config - same project used by the app
+		const firebaseConfig = {
+			apiKey: "AIzaSyBP7NUTGpupGEz5ZH28AhY8DHZkKRWTU",
+			authDomain: "daily-diary-26dbf.firebaseapp.com",
+			databaseURL: "https://daily-diary-26dbf-default-rtdb.firebaseio.com",
+			projectId: "daily-diary-26dbf",
+			storageBucket: "daily-diary-26dbf.firebasestorage.app",
+			messagingSenderId: "994518127061",
+			appId: "1:994518127061:web:89064378570723575bed5c",
+			measurementId: "G-YRDNL38G9X"
+		};
+
+		// init db (works if another module already initialized app)
+		let db;
+		try { db = getDatabase(); } catch(e) { const app = initializeApp(firebaseConfig); db = getDatabase(app); }
+
+		const statusLabel = document.getElementById('statusLabel');
+		const metaInfo = document.getElementById('metaInfo');
+		const toggleBtn = document.getElementById('toggleBtn');
+		const forceOffBtn = document.getElementById('forceOffBtn');
+		const changedByIn = document.getElementById('changedBy');
+
+		const sysRef = ref(db, '/system');
+		// reflect live changes
+		onValue(sysRef, snap => {
+			const val = snap.val() || {};
+			const enabled = (typeof val.enabled === 'boolean') ? val.enabled : true;
+			statusLabel.textContent = enabled ? 'ONLINE' : 'OFFLINE';
+			statusLabel.style.color = enabled ? '#0a8f2c' : '#a30000';
+			toggleBtn.textContent = enabled ? 'Turn OFF' : 'Turn ON';
+			toggleBtn.className = enabled ? 'primary' : 'primary';
+			metaInfo.textContent = '';
+			if(val.changedBy || val.changedAt){
+				const when = val.changedAt ? (new Date(val.changedAt)).toLocaleString() : 'unknown time';
+				metaInfo.textContent = `Last changed by ${val.changedBy || 'unknown'} at ${when}`;
+			}
+		}, err => {
+			statusLabel.textContent = 'Error';
+			metaInfo.textContent = 'Could not read system state: ' + err;
+		});
+
+		function writeEnabled(enabled){
+			const who = (changedByIn.value && changedByIn.value.trim()) || 'admin';
+			update(sysRef, { enabled: !!enabled, changedBy: who, changedAt: Date.now() })
+				.catch(err => alert('Write failed: ' + err));
+		}
+
+		toggleBtn.addEventListener('click', async ()=>{
+			// read current value once, then write opposite
+			const snap = await (await import('https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js')).get(sysRef).catch(()=>null);
+			const cur = snap && snap.exists() ? snap.val().enabled : true;
+			const newVal = !cur;
+			if(!newVal){
+				// turning off - require confirmation
+				if(!confirm('Are you sure you want to turn the system OFF? This will make the application behave as shutdown for users.')) return;
+			}
+			writeEnabled(newVal);
+		});
+
+		forceOffBtn.addEventListener('click', ()=>{
+			if(!confirm('Force OFF - This will immediately set system to OFF. Continue?')) return;
+			writeEnabled(false);
+		});
+    
+	</script>
+</body>
+</html>

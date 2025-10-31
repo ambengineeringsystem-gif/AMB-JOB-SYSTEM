@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Job Board - Kanban</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Page background using AMB-BG.png with a subtle light overlay for readability */
+    html, body { height: 100%; }
+    body {
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+  /* Ensure main content sits above the background; ensure modals sit above everything */
+  header, main { position: relative; z-index: 2; }
+  /* Background image is painted in a pseudo-element so we can fade it in smoothly */
+  body { position: relative; }
+  body::before{ content: ""; position:fixed; inset:0; background-image: url('admin/AMB-BG.png'); background-position: center; background-repeat: no-repeat; background-size:65%; background-attachment: fixed; opacity:0; transition: opacity 900ms ease-in-out; z-index:0; pointer-events:none; }
+  /* gradient overlay sits above the image but below content */
+  body::after{ content: ""; position:fixed; inset:0; background: linear-gradient(rgba(255,255,255,0.6), rgba(255,255,255,0.6)); z-index:1; pointer-events:none; }
+  body.bg-loaded::before{ opacity:1; }
+  /* Modals must be fixed and high z-index so they appear above the page background/header */
+  .modal { position: fixed; z-index: 9999; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="left-controls">
+      <button id="createTaskBtn" aria-label="Create task">CREATE TASK <strong>+</strong></button>
+  <h1 id="boardTitle">Job Board</h1>
+      <div id="currentUserDisplay" style="margin-left:12px;font-size:13px;color:#555">Not signed in</div>
+      <!-- Board selector -->
+      <select id="boardSelector" style="margin-left:12px;padding:6px;border-radius:6px;border:1px solid #ddd"></select>
+    </div>
+    <div class="controls">
+      <!-- Job creation is only available via the CREATE TASK button on the left -->
+      
+      <!-- Clear All removed; actions moved into hamburger menu -->
+      <div class="hamburger-wrapper" style="position:relative;display:inline-block;margin-left:12px;">
+        <button id="hamburgerBtn" aria-label="Menu" style="padding:6px 8px;border-radius:6px;">☰</button>
+        <div id="hamburgerMenu" style="position:absolute;right:0;top:32px;background:#fff;border:1px solid #ddd;padding:8px;border-radius:6px;display:none;min-width:160px;box-shadow:0 6px 18px rgba(0,0,0,0.08);">
+ 
+            <div style="margin-top:6px;"><button id="menuAdmin" onclick="(function(){try{const raw=localStorage.getItem('kanban_current_user');const cu=raw?JSON.parse(raw):null;if(cu&&cu.username==='admin'){window.open('admin/index.html','_blank');}else{const a=document.getElementById('adminAuthModal');if(a){document.getElementById('adminAuthUser')&&(document.getElementById('adminAuthUser').value='');document.getElementById('adminAuthPass')&&(document.getElementById('adminAuthPass').value='');document.getElementById('adminAuthError')&&(document.getElementById('adminAuthError').style.display='none');a.style.display='flex';}else{window.location.href='admin/index.html';}}}catch(e){try{window.location.href='admin/index.html';}catch(_){} } finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">ADMIN</button></div>
+            <div style="margin-top:6px;"><button id="menuLogin" onclick="(function(){try{const lm=document.getElementById('loginModal');if(lm){lm.style.display='flex';}document.getElementById('loginUser')&&(document.getElementById('loginUser').value='');document.getElementById('loginPass')&&(document.getElementById('loginPass').value='');document.getElementById('loginError')&&(document.getElementById('loginError').style.display='none');}catch(e){} finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">Login</button></div>
+            <div style="margin-top:6px;"><button id="menuLogout" onclick="(function(){try{if(!localStorage.getItem('kanban_current_user')){alert('Not signed in');return;}localStorage.removeItem('kanban_current_user');try{location.reload();}catch(e){alert('Signed out');}}catch(e){} finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">Logout</button></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="board" class="board">
+    <!-- Columns will be injected by JS -->
+  </main>
+
+  <template id="cardTemplate">
+    <div class="card" draggable="true">
+    <div class="card-title"></div>
+      <div class="card-actions">
+        <button class="delete">✕</button>
+      </div>
+    </div>
+  </template>
+
+  <div id="status" style="position:fixed;right:12px;bottom:12px;padding:6px 10px;background:#222;color:#fff;border-radius:6px;font-size:12px;opacity:0.9">Offline</div>
+  <!-- Create Task modal (hidden) -->
+  <div id="createModal" class="modal" style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+    <div class="modal-panel" style="background:#fff;border-radius:8px;padding:16px;max-width:520px;margin:40px auto;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+      <h2 style="margin-top:0">Create Job</h2>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input id="createTitle" placeholder="Title" style="padding:8px;border:1px solid #ddd;border-radius:6px" />
+        <textarea id="createDesc" placeholder="Description (optional)" rows="4" style="padding:8px;border:1px solid #ddd;border-radius:6px"></textarea>
+        <div style="display:flex;gap:8px">
+          <input id="createAssignee" placeholder="Assignee" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px" />
+          <input id="createDue" type="date" style="padding:8px;border:1px solid #ddd;border-radius:6px" />
+        </div>
+        <select id="createCategory" style="padding:8px;border:1px solid #ddd;border-radius:6px"></select>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+          <button id="createCancel">Cancel</button>
+          <button id="createSave" style="background:#2b7cff;color:#fff;border:0;padding:8px 12px;border-radius:6px">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Job details modal -->
+  <div id="detailsModal" class="modal" style="display:none">
+    <div class="modal-panel details-panel">
+      <div class="details-header">
+        <h2 id="detailTitle">Job Details</h2>
+        <button id="detailClose" class="modal-close-button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="details-meta">
+        <div class="meta-left">
+          <div class="meta-item"><strong>Category</strong><div id="detailCategory" class="badge"></div></div>
+          <div class="meta-item"><strong>Assignee</strong><div id="detailAssignee" class="muted"></div></div>
+        </div>
+        <div class="meta-right">
+          <div class="meta-item"><strong>Due</strong><div id="detailDue" class="muted"></div></div>
+          <div class="meta-item"><strong>Created by</strong><div id="detailCreatedBy" class="muted"></div></div>
+        </div>
+      </div>
+
+      <div id="detailDesc" class="details-desc"></div>
+
+      <div class="attachments" style="margin-top:12px">
+        <h4 style="margin:6px 0">Attachments</h4>
+        <div id="attachmentsList" style="margin-bottom:8px;color:#333">No attachments</div>
+        <input type="file" id="attachmentInput" accept="application/pdf" style="display:none" />
+        <button id="attachBtn" style="background:#2b7cff;color:#fff;border:0;padding:6px 10px;border-radius:6px">Attach PDF</button>
+        <div id="attachmentStatus" style="font-size:12px;color:#444;margin-top:6px"></div>
+      </div>
+
+      <!-- Comments section -->
+  <!-- Custom fields created by Admin (comment boxes, checkboxes) -->
+  <div id="customFieldsContainer" style="margin-top:12px;display:none"></div>
+
+  <div id="commentsSection" style="margin-top:12px">
+        <h4 style="margin:6px 0">Comments</h4>
+        <div id="commentsList" style="max-height:200px;overflow:auto;padding:8px;border-radius:6px;background:#fff;border:1px solid #eef4fb"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <textarea id="commentInput" placeholder="Add a comment" rows="2" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px"></textarea>
+          <div style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end">
+            <button id="commentSubmit" style="background:#2b7cff;color:#fff;border:0;padding:8px 12px;border-radius:6px">Post</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="details-footer">
+        <div class="created-info">Created: <span id="detailCreated"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="categories.js"></script>
+  <script type="module" src="users.js"></script>
+  <script type="module" src="boards.js"></script>
+  <!-- Admin auth modal (secure access to Manage Users) -->
+  <div id="adminAuthModal" class="modal" style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+    <div class="modal-panel" style="background:#fff;border-radius:8px;padding:16px;max-width:360px;margin:40px auto;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+      <h3 style="margin-top:0">Admin authentication</h3>
+      <p style="margin:0 0 8px 0;color:#444;font-size:13px">Enter admin username and password to manage users.</p>
+      <input id="adminAuthUser" placeholder="username" style="width:100%;padding:8px;margin-bottom:8px" />
+      <input id="adminAuthPass" placeholder="password" type="password" style="width:100%;padding:8px;margin-bottom:8px" />
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button id="adminAuthCancel">Cancel</button>
+        <button id="adminAuthSubmit" style="background:#2b7cff;color:#fff;border:0;padding:8px 12px;border-radius:6px">Authenticate</button>
+      </div>
+      <div id="adminAuthError" style="color:#900;margin-top:8px;display:none"></div>
+    </div>
+  </div>
+  <!-- Login modal (simple centered sign-in box, like admin) -->
+  <div id="loginModal" style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(2,6,23,0.45),rgba(2,6,23,0.45));align-items:center;justify-content:center;padding:24px;z-index:60;">
+    <div class="modal-card" style="background:linear-gradient(180deg,#fff,#fbfdff);border-radius:12px;padding:18px;max-width:420px;margin:46px auto;box-shadow:0 18px 60px rgba(2,6,23,0.45);border:1px solid rgba(2,6,23,0.06);width:100%">
+      <h3 style="margin-top:0">Sign in</h3>
+      <!-- hidden dummy fields to discourage browser autofill -->
+      <input type="text" name="fakeusernameremembered" style="display:none" autocomplete="username" />
+      <input type="password" name="fakepasswordremembered" style="display:none" autocomplete="new-password" />
+      <form id="loginForm" style="margin:0" autocomplete="off">
+        <input id="loginUser" name="u_" placeholder="username" autocomplete="off" style="width:100%;padding:8px;margin-bottom:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.06)" />
+        <input id="loginPass" name="p_" placeholder="password" type="password" autocomplete="new-password" style="width:100%;padding:8px;margin-bottom:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.06)" />
+        <div class="actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+          <button type="button" id="loginCancel">Cancel</button>
+          <button type="button" id="loginSubmit" style="background:#2b7cff;color:#fff;border:0;padding:8px 12px;border-radius:6px">Sign in</button>
+        </div>
+        <div id="loginError" style="color:#900;margin-top:8px;display:none"></div>
+      </form>
+    </div>
+  </div>
+  <script>
+    // Preload background image and fade it in when ready
+    (function(){
+      try{
+        const img = new Image();
+        let done = false;
+        img.onload = function(){ try{ document.body.classList.add('bg-loaded'); }catch(e){} done = true; };
+        img.onerror = function(){ setTimeout(()=>{ try{ document.body.classList.add('bg-loaded'); }catch(e){} }, 300); };
+        img.src = 'admin/AMB-BG.png';
+        // fallback: ensure we add class on window load if image doesn't fire quickly
+        window.addEventListener('load', ()=>{ if(!done) try{ document.body.classList.add('bg-loaded'); }catch(e){} });
+      }catch(e){}
+    })();
+  </script>
+  <script type="module" src="app.js"></script>
+  <script>
+    // board selector wiring: populate from boards and switch selection
+    (function(){
+      const sel = document.getElementById('boardSelector');
+      function renderBoards(list){
+        if(!sel) return;
+        let boards = Array.isArray(list) ? list : [];
+        const cur = localStorage.getItem('kanban_selected_board') || 'default';
+        sel.innerHTML = '';
+        // get current user and filter boards
+        let currentUser = null;
+        try{
+          const raw = localStorage.getItem('kanban_current_user');
+          if(raw) currentUser = JSON.parse(raw);
+        }catch(e){}
+        let userBoards = null;
+        if(currentUser && currentUser.username){
+          // get user details from cache
+          let users = window._USERSCache || null;
+          if(!users){
+            try{
+              const raw = localStorage.getItem('kanban_users_v1');
+              if(raw) users = JSON.parse(raw);
+            }catch(e){}
+          }
+          const u = users && users[currentUser.username];
+          if(u && Array.isArray(u.visibleBoards) && u.visibleBoards.length){
+            userBoards = u.visibleBoards;
+          }
+        }
+        // filter boards if user has restrictions
+        if(userBoards){
+          boards = boards.filter(b => userBoards.includes(b.id));
+        }
+        // if there are no boards, hide the selector
+        if(boards.length === 0){
+          sel.style.display = 'none';
+          // signal lack of boards to the app
+          window._HAS_BOARDS = false;
+          window.dispatchEvent(new CustomEvent('boards-availability-changed', { detail: { hasBoards: false } }));
+          return;
+        }
+        // otherwise populate and show
+        sel.style.display = '';
+        boards.forEach(b => {
+          const opt = document.createElement('option'); opt.value = b.id; opt.textContent = b.title || b.id; sel.appendChild(opt);
+        });
+        // set selected value, but if current is not in list, set to first
+        if(boards.some(b => b.id === cur)){
+          sel.value = cur;
+        } else {
+          sel.value = boards[0].id;
+          localStorage.setItem('kanban_selected_board', boards[0].id);
+          window.dispatchEvent(new CustomEvent('board-changed', { detail: { boardId: boards[0].id } }));
+        }
+        window._HAS_BOARDS = true;
+        window.dispatchEvent(new CustomEvent('boards-availability-changed', { detail: { hasBoards: true } }));
+      }
+      // listen for boards updates from boards.js
+      window.addEventListener('boards-updated', (e)=>{ try{ renderBoards((e.detail && e.detail.boards) || []); }catch(err){} });
+      // when changing selection, persist and notify app
+      if(sel){ sel.addEventListener('change', (ev)=>{ const id = ev.target.value; localStorage.setItem('kanban_selected_board', id); window.dispatchEvent(new CustomEvent('board-changed', { detail: { boardId: id } })); }); }
+      // request initial list (boards.js will dispatch boards-updated on load)
+      try{ if(window._BOARDS && window._BOARDS.getAll){ window._BOARDS.getAll().then(map => { const list = Object.keys(map || {}).map(k=>map[k]); renderBoards(list); }); } }catch(e){}
+      // re-render when user changes
+      window.addEventListener('storage', (e) => {
+        if(e.key === 'kanban_current_user'){
+          try{ if(window._BOARDS && window._BOARDS.getAll){ window._BOARDS.getAll().then(map => { const list = Object.keys(map || {}).map(k=>map[k]); renderBoards(list); }); } }catch(e){}
+        }
+        if(e.key === 'kanban_users_v1'){
+          // update users cache and re-render boards
+          try{
+            const raw = localStorage.getItem('kanban_users_v1');
+            if(raw) window._USERSCache = JSON.parse(raw);
+            if(window._BOARDS && window._BOARDS.getAll){ window._BOARDS.getAll().then(map => { const list = Object.keys(map || {}).map(k=>map[k]); renderBoards(list); }); }
+          }catch(e){}
+        }
+      });
+      window.addEventListener('users-updated', () => {
+        try{ if(window._BOARDS && window._BOARDS.getAll){ window._BOARDS.getAll().then(map => { const list = Object.keys(map || {}).map(k=>map[k]); renderBoards(list); }); } }catch(e){}
+      });
+      // update header title when boards list or selection changes
+      const boardTitleEl = document.getElementById('boardTitle');
+      function updateBoardTitle(boardId, boardsList){
+        try{
+          const id = boardId || (localStorage.getItem('kanban_selected_board') || 'default');
+          const boards = Array.isArray(boardsList) ? boardsList : null;
+          if(boards){
+            const found = boards.find(b => b.id === id);
+            if(found){ boardTitleEl.textContent = found.title || found.id; return; }
+          }
+          // fallback: use id if no title available
+          boardTitleEl.textContent = id === 'default' ? 'Job Board' : id;
+        }catch(e){}
+      }
+      window.addEventListener('boards-updated', (e)=>{ try{ const list = (e.detail && e.detail.boards) || []; updateBoardTitle(null, list); }catch(err){} });
+      window.addEventListener('board-changed', (e)=>{ try{ const bid = e?.detail?.boardId || localStorage.getItem('kanban_selected_board'); updateBoardTitle(bid); }catch(err){} });
+    })();
+    // Show ADMIN button only for the unremovable admin account and wire click to open admin console
+    (function(){
+      const btn = document.getElementById('menuAdmin');
+      if(!btn) return;
+      // Attach click handler unconditionally so it works even when the user signs in after page load.
+      btn.addEventListener('click', function(){
+        try{
+          const raw = localStorage.getItem('kanban_current_user');
+          const cu = raw ? JSON.parse(raw) : null;
+          // If current user is admin, open the admin console in a new tab.
+          if(cu && cu.username === 'admin'){
+            // window.open may return null if blocked; we still attempt it (it's a user gesture).
+            window.open('admin/index.html', '_blank');
+          } else {
+            // Otherwise prompt for admin authentication (reuse the admin auth modal when available)
+            const adminAuthModal = document.getElementById('adminAuthModal');
+            if(adminAuthModal){
+              // clear fields and show
+              const aUser = document.getElementById('adminAuthUser');
+              const aPass = document.getElementById('adminAuthPass');
+              const aErr = document.getElementById('adminAuthError');
+              if(aUser) aUser.value = '';
+              if(aPass) aPass.value = '';
+              if(aErr) aErr.style.display = 'none';
+              adminAuthModal.style.display = 'flex';
+            } else {
+              alert('Admin access requires signing in as admin');
+            }
+          }
+        }catch(e){
+          // Fallback: navigate to admin page
+          try{ window.location.href = 'admin/index.html'; }catch(err){}
+        }
+        // close hamburger menu if present
+        const hm = document.getElementById('hamburgerMenu'); if(hm) hm.style.display = 'none';
+      });
+
+      // Set initial visibility based on current user (keeps existing behaviour of hiding button when not admin)
+      try{
+        const raw = localStorage.getItem('kanban_current_user');
+        const cu = raw ? JSON.parse(raw) : null;
+        btn.style.display = (cu && cu.username === 'admin') ? '' : 'none';
+      }catch(e){ btn.style.display = 'none'; }
+    })();
+  </script>
+</body>
+</html>

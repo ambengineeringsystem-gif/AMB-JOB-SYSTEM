@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Kanban Management</title>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    :root{ --bg:#f6f8fb; --card:#ffffff; --muted:#6b7280; --accent:#2563eb; --accent-2:#1e40af; --success:#059669; --danger:#dc2626; --glass: rgba(255,255,255,0.6)}
+    html,body{height:100%}
+    body{font-family:system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:24px;background:linear-gradient(180deg,var(--bg),#eef4ff);color:#0f172a}
+    .panel{max-width:960px;margin:18px auto;background:var(--card);padding:20px;border-radius:12px;box-shadow:0 10px 30px rgba(16,24,40,0.08);border:1px solid rgba(16,24,40,0.04)}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header h1{margin:0;font-size:20px;letter-spacing:-0.2px}
+    .controls{display:flex;align-items:center;gap:10px}
+    .hint{color:var(--muted);font-size:13px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:1px solid rgba(15,23,42,0.06);background:linear-gradient(180deg,#fff,#f7fbff);cursor:pointer;font-weight:600;color:var(--accent-2);box-shadow:0 2px 6px rgba(16,24,40,0.04)}
+    .btn:disabled{opacity:0.52;cursor:not-allowed}
+    .btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-2));color:#fff;border:0;box-shadow:0 6px 18px rgba(37,99,235,0.18)}
+    .btn.ghost{background:transparent;border:1px dashed rgba(15,23,42,0.06);color:var(--muted);font-weight:600}
+    .log{margin-top:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;color:#0f172a;max-height:320px;overflow:auto;padding:12px;border-radius:10px;background:linear-gradient(180deg,#f7fbff,#f2f6fb);border:1px solid rgba(15,23,42,0.03)}
+    .row{display:flex;gap:12px;align-items:center}
+    #categoryUploadSettings{margin-top:22px}
+    /* Modal */
+    #adminLoginModal{display:none;position:fixed;left:0;top:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(2,6,23,0.45),rgba(2,6,23,0.45));align-items:center;justify-content:center;padding:24px;z-index:60}
+    #adminLoginModal .modal-card{background:linear-gradient(180deg,#fff,#fbfdff);border-radius:12px;padding:18px;max-width:420px;margin:46px auto;box-shadow:0 18px 60px rgba(2,6,23,0.45);border:1px solid rgba(2,6,23,0.06)}
+    #adminLoginModal h3{margin:0 0 8px 0}
+    #adminLoginForm input[type="text"],#adminLoginForm input[type="password"]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(15,23,42,0.06);background:transparent;outline:none}
+    #adminLoginForm .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
+    #adminLoginError{color:var(--danger);margin-top:8px;display:none}
+    label[for^="uploadable_"]{font-size:13px;color:var(--muted)}
+    .category-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+    @media (max-width:640px){ .panel{margin:12px} header{flex-direction:column;align-items:flex-start} .controls{width:100%;flex-wrap:wrap} }
+  /* Floating board picker */
+  .board-picker { position:fixed; right:20px; bottom:20px; z-index:80; display:none; }
+  .board-picker .picker-btn { width:56px; height:56px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:var(--accent); color:#fff; box-shadow:0 10px 30px rgba(37,99,235,0.18); border:0; cursor:pointer; font-weight:700 }
+  .board-picker .picker-menu { position:absolute; right:0; bottom:74px; min-width:220px; background:var(--card); border-radius:10px; box-shadow:0 12px 40px rgba(2,6,23,0.12); overflow:hidden; border:1px solid rgba(15,23,42,0.04); display:none }
+  .board-picker .picker-menu .item { padding:10px 12px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; align-items:center }
+  .board-picker .picker-menu .item:hover { background:linear-gradient(90deg,#f7fbff,#f2f6fb) }
+  .board-picker .picker-menu .title { font-weight:600 }
+  .board-picker .picker-menu .current { font-size:12px; color:var(--muted) }
+  </style>
+</head>
+<body>
+  <div class="panel" style="display:none;">
+    <header>
+      <h1>Kanban Admin</h1>
+      <div class="controls">
+        <div id="adminStatus" class="hint">Not authenticated</div>
+        <div class="row">
+          <!-- Admin Sign in button removed; login modal shows on page load -->
+          <button id="openUsers" class="btn" disabled>Manage Users</button>
+          <button id="openCats" class="btn" disabled>Manage Categories</button>
+          <button id="openBoards" class="btn" disabled>Manage Boards</button>
+          <button id="openCategoryUploads" class="btn">Category Uploads</button>
+          <button id="openCommentSettings" class="btn" disabled>Comment Settings</button>
+          <button id="openCustomFields" class="btn" disabled>Custom Fields</button>
+        </div>
+      </div>
+    </header>
+    
+  <!-- on-page log removed; logs will go to the browser console only -->
+    <!-- Placeholder image shown when no settings panel is open -->
+    <div id="adminPlaceholder" style="margin-top:18px;display:block;text-align:center;">
+      <img src="AMB-BG.png" alt="Admin placeholder" style="max-width:640px;width:100%;height:auto;border-radius:10px;box-shadow:0 8px 30px rgba(2,6,23,0.08);opacity:0.98" />
+    </div>
+  <!-- Category Uploads will be shown inside this settings panel when the button is clicked -->
+    <div id="adminSettingsArea" style="margin-top:18px;display:none;">
+    <div id="categoryUploadSettings" class="" ></div>
+    <div id="customFieldsSettings" style="margin-top:18px;display:none;"></div>
+  </div>
+  </div>
+
+  <!-- inline login modal used by admin page to authenticate -->
+  <div id="adminLoginModal" style="display:flex;position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+    <div class="modal-card">
+      <h3 style="margin-top:0">Admin Sign in</h3>
+      <!-- hidden dummy fields to discourage browser autofill -->
+      <input type="text" name="fakeusernameremembered" id="fakeusernameremembered" style="display:none" autocomplete="username" />
+      <input type="password" name="fakepasswordremembered" id="fakepasswordremembered" style="display:none" autocomplete="new-password" />
+  <form id="adminLoginForm" autocomplete="off" style="margin:0">
+        <!-- use unpredictable name attributes to discourage autofill heuristics -->
+        <input id="adminLoginUser" name="u_" placeholder="username" autocomplete="off" style="width:100%;padding:8px;margin-bottom:8px" />
+        <input id="adminLoginPass" name="p_" placeholder="password" type="password" autocomplete="new-password" style="width:100%;padding:8px;margin-bottom:8px" />
+        <div class="actions">
+          <button type="button" id="adminLoginCancel" class="btn ghost">Cancel</button>
+          <button type="submit" id="adminLoginSubmit" class="btn primary">Sign in</button>
+        </div>
+      </form>
+      <div id="adminLoginError" style="color:#900;margin-top:8px;display:none"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
+    import { getDatabase, ref, onValue, set, update } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
+    // Eagerly attempt to load users module so login is available immediately on the admin page
+    (async function preloadUsersModule(){
+      try{ await import('../users.js'); }catch(e){ try{ await import('./users.js'); }catch(err){} }
+    })();
+    const firebaseConfig = {
+      apiKey: "AIzaSyBP7NUTGpupGEz5ZH28AhY8DHZKxkKRWTU",
+      authDomain: "daily-diary-26dbf.firebaseapp.com",
+      databaseURL: "https://daily-diary-26dbf-default-rtdb.firebaseio.com",
+      projectId: "daily-diary-26dbf",
+      storageBucket: "daily-diary-26dbf.firebasestorage.app",
+      messagingSenderId: "994518127061",
+      appId: "1:994518127061:web:89064378570723575bed5c",
+      measurementId: "G-YRDNL38G9X"
+    };
+    let db;
+    try {
+      db = getDatabase();
+    } catch(e) {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+    }
+    function currentBoardId() { return localStorage.getItem('kanban_selected_board') || 'default'; }
+    function categoriesPathForBoard(b) { return '/boards/' + (b || currentBoardId()) + '/categories'; }
+    // Render uploadable settings UI into the admin settings area
+    // Accepts either:
+    // - an array of strings (legacy: "Board / Category") OR
+    // - an array of objects { boardId, boardTitle, catKey, catTitle }
+    function renderCategoryUploadSettings(categories) {
+      const container = document.getElementById('categoryUploadSettings');
+      if (!container) return;
+      container.innerHTML = '<h3>Category File Upload Settings</h3>';
+      if (!Array.isArray(categories) || categories.length === 0) {
+        container.innerHTML += '<div style="color:#900">No categories found for this board.</div>';
+        return;
+      }
+      // normalize to structured items
+      const items = categories.map(item => {
+        if(!item) return null;
+        if(typeof item === 'string'){
+          // try to split "Board / Category"
+          const parts = item.split(' / ');
+          if(parts.length >= 2){
+            return { boardTitle: parts[0], catTitle: parts.slice(1).join(' / '), boardId: null, catKey: parts.slice(1).join(' / ') };
+          }
+          return { boardTitle: null, catTitle: item, boardId: null, catKey: item };
+        }
+        // assume object with needed properties
+        return { boardId: item.boardId || item.id || null, boardTitle: item.boardTitle || item.title || item.name || null, catKey: item.catKey || item.key || null, catTitle: item.catTitle || item.title || null };
+      }).filter(Boolean);
+
+      items.forEach(it => {
+        const row = document.createElement('div'); row.className = 'category-row';
+        const label = document.createElement('span');
+        label.textContent = (it.boardTitle ? (it.boardTitle + ' / ') : '') + (it.catTitle || it.catKey || '');
+        label.style.minWidth = '200px';
+        row.appendChild(label);
+
+        const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
+        // create a unique id using boardId and catKey when available
+        const safeBoard = (it.boardId || '').toString().replace(/[^a-z0-9_-]/ig,'_');
+        const safeCat = (it.catKey || (it.catTitle||'')).toString().replace(/[^a-z0-9_-]/ig,'_');
+        const safeId = 'uploadable_' + (safeBoard ? (safeBoard + '_') : '') + safeCat;
+        checkbox.id = safeId; checkbox.style.transform = 'scale(1.1)';
+
+        // determine DB path: if we have boardId and catKey use them; otherwise attempt to find by title under current board
+        const loadPath = () => {
+          if(it.boardId && it.catKey){
+            return `/boards/${it.boardId}/categories/${it.catKey}/uploadable`;
+          }
+          // fallback: try current board and use catKey as key
+          return categoriesPathForBoard() + '/' + (it.catKey || it.catTitle);
+        };
+
+        // Fetch current setting from Firebase
+        try{
+          onValue(ref(db, loadPath()), snap => { checkbox.checked = !!snap.val(); }, { onlyOnce: true });
+        }catch(e){ /* ignore */ }
+
+        checkbox.addEventListener('change', () => {
+          try{
+            const path = loadPath();
+            // write boolean under uploadable without replacing the whole category
+            set(ref(db, path), checkbox.checked);
+          }catch(e){ console.warn('Failed to set uploadable', e); }
+        });
+
+        row.appendChild(checkbox);
+        const cbLabel = document.createElement('label'); cbLabel.htmlFor = checkbox.id; cbLabel.textContent = 'Allow file uploads'; row.appendChild(cbLabel);
+        container.appendChild(row);
+      });
+    }
+    
+    // Render comment permissions settings into the admin settings area
+    async function renderCommentSettings(){
+      const container = document.getElementById('categoryUploadSettings');
+      if(!container) return;
+      container.innerHTML = '';
+      const title = document.createElement('h3'); title.textContent = 'Comment Permissions (per user)'; container.appendChild(title);
+
+      // load users list via helper when available
+      let usersMap = {};
+      try{
+        if(window._USERS && window._USERS.getAll){ usersMap = await window._USERS.getAll(); }
+        else {
+          // fallback to DB read
+          await new Promise((resolve)=>{
+            onValue(ref(db, '/users'), snap => { usersMap = snap.val() || {}; resolve(); }, { onlyOnce: true });
+          });
+        }
+      }catch(e){ console.warn('Failed to load users for comment settings', e); }
+
+      const users = Object.keys(usersMap || {}).sort();
+      if(users.length === 0){ container.innerHTML += '<div style="color:#900">No users found.</div>'; return; }
+
+      const table = document.createElement('div'); table.style.display='grid'; table.style.gridTemplateColumns='200px 1fr 1fr 1fr'; table.style.gap='8px'; table.style.alignItems='center'; table.style.marginTop='12px';
+      const headerRow = document.createElement('div'); headerRow.style.gridColumn='1 / -1'; headerRow.style.display='flex'; headerRow.style.justifyContent='space-between'; headerRow.style.alignItems='center'; headerRow.style.marginBottom='8px';
+      const hdr = document.createElement('div'); hdr.textContent = 'Set which users can view/create/delete comments (changes saved immediately).'; hdr.className='hint'; headerRow.appendChild(hdr);
+      table.appendChild(headerRow);
+
+      // column labels
+      const cUser = document.createElement('div'); cUser.textContent='User'; cUser.style.fontWeight='600'; table.appendChild(cUser);
+      const cView = document.createElement('div'); cView.textContent='Can view'; cView.style.fontWeight='600'; table.appendChild(cView);
+      const cCreate = document.createElement('div'); cCreate.textContent='Can create'; cCreate.style.fontWeight='600'; table.appendChild(cCreate);
+      const cDelete = document.createElement('div'); cDelete.textContent='Can delete'; cDelete.style.fontWeight='600'; table.appendChild(cDelete);
+
+      users.forEach(u => {
+        const data = usersMap[u] || {};
+        const uname = document.createElement('div'); uname.textContent = u; table.appendChild(uname);
+        const v = document.createElement('div'); const vcb = document.createElement('input'); vcb.type='checkbox'; vcb.checked = !!(data.canViewComments); v.appendChild(vcb); table.appendChild(v);
+        const c = document.createElement('div'); const ccb = document.createElement('input'); ccb.type='checkbox'; ccb.checked = !!(data.canCreateComments); c.appendChild(ccb); table.appendChild(c);
+        const d = document.createElement('div'); const dcb = document.createElement('input'); dcb.type='checkbox'; dcb.checked = !!(data.canDeleteComments); d.appendChild(dcb); table.appendChild(d);
+
+        // write handler: persist to /users/{u}/<field>
+        const writeFlag = async (field, value) => {
+          try{
+            // use set on the specific child to avoid overwriting the whole user object
+            await set(ref(db, '/users/' + u + '/' + field), value);
+            // also update cached map for immediate UI consistency
+            try{ usersMap[u] = usersMap[u] || {}; usersMap[u][field] = value; }catch(e){}
+          }catch(err){ console.warn('Failed to write user permission', err); alert('Failed to save permission (see console)'); }
+        };
+
+        vcb.addEventListener('change', ()=> writeFlag('canViewComments', !!vcb.checked));
+        ccb.addEventListener('change', ()=> writeFlag('canCreateComments', !!ccb.checked));
+        dcb.addEventListener('change', ()=> writeFlag('canDeleteComments', !!dcb.checked));
+      });
+
+      container.appendChild(table);
+    }
+    // Only render the Category Uploads panel when the admin explicitly opened it.
+    // This prevents the panel from appearing automatically when other modules (like
+    // the Users manager) dispatch 'categories-updated' during their own flows.
+    let _showCategoryUploadsOnUpdate = false;
+    async function loadAllCategories(){
+      const combined = [];
+      let boardsList = [];
+      if(window._BOARDS && window._BOARDS.getAll){
+        try{ const map = await window._BOARDS.getAll(); boardsList = Object.keys(map || {}).map(k => map[k]); }catch(e){ boardsList = []; }
+      }
+      if(!boardsList || boardsList.length === 0){
+        try{
+          await new Promise((resolve) => {
+            onValue(ref(db, '/boards'), snap => {
+              const val = snap.val() || {};
+              boardsList = Object.keys(val || {}).map(k => Object.assign({ id: k }, (val[k] || {})));
+              resolve();
+            }, { onlyOnce: true });
+          });
+        }catch(e){ boardsList = []; }
+      }
+      for(const b of ((boardsList || []).filter(x => (x && (x.id || x) ) !== 'default'))){
+        const id = (b && (b.id || b.key)) ? (b.id || b.key) : (b && b.id) || b;
+        const title = (b && (b.title || b.name)) ? (b.title || b.name) : id;
+        try{
+          const items = await new Promise((resolve) => {
+            try{
+              onValue(ref(db, '/boards/' + id + '/categories'), snap => {
+                const val = snap.val() || {};
+                const list = Object.keys(val || {}).map(k => ({ key: k, title: (val[k] && val[k].title) ? val[k].title : k }));
+                resolve(list);
+              }, { onlyOnce: true });
+            }catch(e){ resolve([]); }
+          });
+          items.forEach(cat => combined.push({ boardId: id, boardTitle: title, catKey: cat.key, catTitle: cat.title }));
+        }catch(e){ /* ignore per-board errors */ }
+      }
+      return combined;
+    }
+
+    window.addEventListener('categories-updated', async e => {
+      try{
+        if(_showCategoryUploadsOnUpdate){
+          const all = await loadAllCategories();
+          renderCategoryUploadSettings(all);
+        }
+      }catch(err){ /* ignore */ }
+    });
+    // admin console bootstrapping
+  const statusEl = document.getElementById('adminStatus');
+  const openUsers = document.getElementById('openUsers');
+  const openCats = document.getElementById('openCats');
+  // openLogin button removed; login modal is shown by default
+    const modal = document.getElementById('adminLoginModal');
+    const userIn = document.getElementById('adminLoginUser');
+    const passIn = document.getElementById('adminLoginPass');
+  const cancelBtn = document.getElementById('adminLoginCancel');
+  const submitBtn = document.getElementById('adminLoginSubmit');
+  const loginForm = document.getElementById('adminLoginForm');
+    const errEl = document.getElementById('adminLoginError');
+    let authedUser = null;
+
+  // replace in-page logging with console logging only so the admin UI isn't cluttered
+  function log(msg){ try{ console.info((new Date()).toLocaleTimeString() + ' - ' + msg); }catch(e){} }
+
+    // lazy-load users and categories modules; they will register window._USERS and dispatch events
+    
+    async function tryImportWithFallback(paths){
+      for(const p of paths){
+        try{
+          await import(p);
+          log('Imported module ' + p);
+          return p;
+        }catch(err){
+          log('Failed to import ' + p + ': ' + (err && err.message ? err.message : String(err)));
+        }
+      }
+      throw new Error('All import attempts failed: ' + paths.join(', '));
+    }
+
+    async function ensureModules(){
+      // attempt to load users and categories modules from several sensible locations
+      // so the admin page works whether you serve from the repo root or from the admin folder.
+      if(!window._USERS){
+        try{
+          // try server-root absolute path first, then parent-relative, then local
+          await tryImportWithFallback(['/users.js','../users.js','./users.js']);
+        }catch(e){
+          console.warn('Users module import failed', e);
+        }
+      }
+      if(!window._CATS_LOADED){
+        try{
+          // categories.js doesn't set a global flag, so mark it loaded after successful import
+          await tryImportWithFallback(['/categories.js','../categories.js','./categories.js']);
+          // set a small flag so callers know categories are available
+          try{ window._CATS_LOADED = true; }catch(e){}
+        }catch(e){
+          console.warn('Categories module import failed', e);
+        }
+      }
+      if(!window._BOARDS){
+        try{
+          await tryImportWithFallback(['/boards.js','../boards.js','./boards.js']);
+        }catch(e){
+          console.warn('Boards module import failed', e);
+        }
+      }
+    }
+
+    // Login modal is shown on load; ensure inputs are prepared when script runs
+    (function prepareLoginInputs(){
+      try{
+        // clear values and protect against autofill heuristics
+        userIn.value = '';
+        passIn.value = '';
+        errEl.style.display = 'none';
+        userIn.readOnly = true; passIn.readOnly = true;
+        const enableOnFocus = (ev) => { ev.target.readOnly = false; ev.target.removeEventListener('focus', enableOnFocus); };
+        userIn.addEventListener('focus', enableOnFocus); passIn.addEventListener('focus', enableOnFocus);
+        userIn.name = 'u_' + Math.random().toString(36).slice(2,8);
+        passIn.name = 'p_' + Math.random().toString(36).slice(2,8);
+      }catch(e){}
+      try{ modal.style.display = 'flex'; }catch(e){}
+    })();
+    cancelBtn.addEventListener('click', ()=>{ modal.style.display = 'none'; });
+    // handle form submit so browser autofill doesn't trigger navigation
+    if(loginForm){
+      loginForm.addEventListener('submit', async (ev)=>{
+        ev.preventDefault();
+        const u = userIn.value && userIn.value.trim();
+        const p = passIn.value && passIn.value.trim();
+        if(!u || !p){ errEl.textContent='Enter username and password'; errEl.style.display='block'; return; }
+        try{
+          if(!window._USERS || !window._USERS.login){ errEl.textContent='Users module not available'; errEl.style.display='block'; return; }
+          const ok = await window._USERS.login(u,p);
+          if(ok){
+            authedUser = u;
+            statusEl.textContent = 'Authenticated as ' + u;
+            openUsers.disabled = false; openCats.disabled = false; 
+            try{ const openBoards = document.getElementById('openBoards'); if(openBoards) openBoards.disabled = false; }catch(e){}
+            try{ const openCustom = document.getElementById('openCustomFields'); if(openCustom) openCustom.disabled = false; }catch(e){}
+            modal.style.display = 'none';
+            log('Authenticated as ' + u);
+            // dispatch admin-auth-success so users.js will open manager when needed
+            const evt = new CustomEvent('admin-auth-success', { detail: { username: u } });
+            window.dispatchEvent(evt);
+          } else {
+            errEl.textContent = 'Invalid admin credentials'; errEl.style.display='block';
+          }
+        }catch(err){ errEl.textContent = 'Auth failed: ' + (err && err.message ? err.message : String(err)); errEl.style.display='block'; }
+      });
+    }
+
+    openUsers.addEventListener('click', async ()=>{
+      // Open Users manager inside the admin settings area (embedded) instead of a modal
+      await ensureModules();
+      try{
+        // ensure the admin settings area is visible and target a dedicated container
+        const container = document.getElementById('categoryUploadSettings');
+        if(container){
+          // expose the container for users.js to render into
+          try{ window._USERS_PANEL_CONTAINER = container; }catch(e){}
+          adminSettingsArea.style.display = 'block';
+          try{ const ph = document.getElementById('adminPlaceholder'); if(ph) ph.style.display = 'none'; }catch(e){}
+          // Do not apply active highlight; keep consistent appearance
+          try{ const cb = document.getElementById('openCategoryUploads'); if(cb) cb.classList.remove('primary'); }catch(e){}
+          try{ const cb2 = document.getElementById('openCommentSettings'); if(cb2) cb2.classList.remove('primary'); }catch(e){}
+        }
+        // dispatch users-manage; users.js will detect window._USERS_PANEL_CONTAINER and render embedded
+        window.dispatchEvent(new CustomEvent('users-manage'));
+        log('Opened Manage Users (embedded)');
+      }catch(err){ console.warn('Failed to open embedded users manager', err); }
+    });
+    // show/hide category upload settings inside the admin panel
+    const openCategoryUploadsBtn = document.getElementById('openCategoryUploads');
+    const adminSettingsArea = document.getElementById('adminSettingsArea');
+  const openCommentSettingsBtn = document.getElementById('openCommentSettings');
+  
+  // Helper to show one settings panel and hide the others
+  function showAdminPanel(panelId){
+    try{
+      // Ensure admin area is visible
+      if(adminSettingsArea) adminSettingsArea.style.display = 'block';
+      try{ const ph = document.getElementById('adminPlaceholder'); if(ph) ph.style.display = 'none'; }catch(e){}
+      const panels = ['categoryUploadSettings','customFieldsSettings'];
+      panels.forEach(id => { try{ const el = document.getElementById(id); if(!el) return; el.style.display = (id === panelId) ? 'block' : 'none'; }catch(e){} });
+    }catch(e){ console.warn('showAdminPanel failed', e); }
+  }
+    if(openCategoryUploadsBtn && adminSettingsArea){
+      openCategoryUploadsBtn.addEventListener('click', async ()=>{
+        // Always open the Category Uploads panel (do not toggle); behave like other admin buttons.
+        _showCategoryUploadsOnUpdate = true;
+        await ensureModules();
+        try{
+          // diagnostic: log boards available to admin loader to help debug empty lists
+          try{ if(window._BOARDS && window._BOARDS.getAll){ const m = await window._BOARDS.getAll(); console.debug('admin: boards from _BOARDS.getAll', m); } }catch(e){}
+          const all = await loadAllCategories();
+          console.debug('admin: loadAllCategories returned', all && all.length ? all.length : 0);
+          renderCategoryUploadSettings(all);
+        }catch(e){ console.debug('admin: loadAllCategories failed', e); renderCategoryUploadSettings([]); }
+  // show only the uploads panel
+  showAdminPanel('categoryUploadSettings');
+  // Do not apply active highlight; keep consistent appearance
+  try{ const cb = document.getElementById('openCats'); if(cb) cb.classList.remove('primary'); }catch(e){}
+  try{ const cbtn = document.getElementById('openCommentSettings'); if(cbtn) cbtn.classList.remove('primary'); }catch(e){}
+      });
+    }
+    // Comment settings panel
+    if(openCommentSettingsBtn && adminSettingsArea){
+      openCommentSettingsBtn.addEventListener('click', async ()=>{
+        // Always open Comment Settings panel (do not toggle)
+        _showCategoryUploadsOnUpdate = false;
+        await ensureModules();
+        try{
+          await renderCommentSettings();
+        }catch(e){ console.warn('Failed to render comment settings', e); adminSettingsArea.innerHTML = '<div style="color:#900">Failed to load comment settings</div>'; }
+  // show the comment settings (uses categoryUploadSettings container)
+  showAdminPanel('categoryUploadSettings');
+  // Do not apply active highlight; keep consistent appearance
+  try{ const cb = document.getElementById('openCats'); if(cb) cb.classList.remove('primary'); }catch(e){}
+  try{ const cbtn = document.getElementById('openCategoryUploads'); if(cbtn) cbtn.classList.remove('primary'); }catch(e){}
+      });
+    }
+    // Custom Fields panel
+    const openCustomFieldsBtn = document.getElementById('openCustomFields');
+    const customFieldsContainer = document.getElementById('customFieldsSettings');
+    if(openCustomFieldsBtn && adminSettingsArea){
+      openCustomFieldsBtn.addEventListener('click', async ()=>{
+        await ensureModules();
+        try{
+          // show custom fields UI (hide other panels)
+          showAdminPanel('customFieldsSettings');
+          if(!customFieldsContainer) return;
+          customFieldsContainer.innerHTML = '<h3>Custom Fields (per-board)</h3>';
+          const bid = currentBoardId();
+          if(!bid){ customFieldsContainer.innerHTML += '<div style="color:#900">No board selected.</div>'; return; }
+          const form = document.createElement('div'); form.style.display='flex'; form.style.gap='8px'; form.style.alignItems='center';
+          // labeled field label input
+          const labelWrap = document.createElement('div'); labelWrap.style.display='flex'; labelWrap.style.flexDirection='column'; labelWrap.style.flex='1';
+          const labelHint = document.createElement('div'); labelHint.textContent = 'Field label'; labelHint.style.fontSize='13px'; labelHint.style.marginBottom='6px';
+          const labelInput = document.createElement('input'); labelInput.placeholder = 'Field label'; labelInput.style.padding='8px'; labelInput.style.flex='1';
+          labelWrap.appendChild(labelHint); labelWrap.appendChild(labelInput);
+          // labeled type selector
+          const typeWrap = document.createElement('div'); typeWrap.style.display='flex'; typeWrap.style.flexDirection='column'; typeWrap.style.gap='6px';
+          const typeHint = document.createElement('div'); typeHint.textContent = 'Type'; typeHint.style.fontSize='13px';
+          const typeSel = document.createElement('select'); const opt1=document.createElement('option'); opt1.value='comment'; opt1.textContent='Comment section'; const opt2=document.createElement('option'); opt2.value='checkbox'; opt2.textContent='Checkbox'; typeSel.appendChild(opt1); typeSel.appendChild(opt2);
+          typeWrap.appendChild(typeHint); typeWrap.appendChild(typeSel);
+          const addBtn = document.createElement('button'); addBtn.className='btn primary'; addBtn.textContent='Add Field';
+          form.appendChild(labelWrap); form.appendChild(typeWrap); form.appendChild(addBtn);
+          customFieldsContainer.appendChild(form);
+          const listDiv = document.createElement('div'); listDiv.style.marginTop='12px'; customFieldsContainer.appendChild(listDiv);
+          // load existing
+          try{
+            const snap = await new Promise((resolve)=>{ onValue(ref(db, '/boards/' + bid + '/customFields'), s => resolve(s), { onlyOnce: true }); });
+            const val = (snap && snap.val()) || {};
+            const keys = Object.keys(val || {});
+            if(keys.length === 0) listDiv.innerHTML = '<div class="hint" style="margin-top:8px">No custom fields defined for this board.</div>';
+            keys.forEach(k => {
+              const f = val[k];
+              const row = document.createElement('div'); row.style.display='flex'; row.style.flexDirection='column'; row.style.gap='6px'; row.style.marginTop='8px';
+              const top = document.createElement('div'); top.style.display='flex'; top.style.gap='8px'; top.style.alignItems='center';
+              const title = document.createElement('div'); title.textContent = (f.label || k) + ' (' + (f.type || '') + ')'; title.style.flex='1';
+              const permsBtn = document.createElement('button'); permsBtn.className='btn'; permsBtn.textContent='Permissions';
+              const del = document.createElement('button'); del.className='btn ghost'; del.textContent='Delete';
+              // Delete handler
+              del.addEventListener('click', async ()=>{ try{ await set(ref(db, '/boards/' + bid + '/customFields/' + k), null); row.remove(); }catch(e){ alert('Failed to delete: ' + (e && e.message)); } });
+              top.appendChild(title); top.appendChild(permsBtn); top.appendChild(del);
+              row.appendChild(top);
+
+              // Permissions panel (initially hidden)
+              const permsPanel = document.createElement('div'); permsPanel.style.display='none'; permsPanel.style.marginTop='6px'; permsPanel.style.padding='8px'; permsPanel.style.border='1px solid rgba(15,23,42,0.04)'; permsPanel.style.borderRadius='8px'; permsPanel.style.background='linear-gradient(180deg,#fff,#fbfdff)';
+              row.appendChild(permsPanel);
+
+              // When clicked, load list of users and current permissions then render checkboxes
+              permsBtn.addEventListener('click', async ()=>{
+                try{
+                  // toggle
+                  if(permsPanel.style.display === 'block'){ permsPanel.style.display = 'none'; return; }
+                  permsPanel.innerHTML = '<div style="color:#666">Loading users…</div>';
+                  permsPanel.style.display = 'block';
+                  // load users list
+                  let usersMap = {};
+                  try{ if(window._USERS && window._USERS.getAll){ usersMap = await window._USERS.getAll(); } else { const snap = await new Promise((resolve)=>{ onValue(ref(db, '/users'), s => resolve(s), { onlyOnce: true }); }); usersMap = (snap && snap.val()) || {}; } }catch(e){ console.warn('Failed to load users for permissions', e); usersMap = {}; }
+                  const users = Object.keys(usersMap || {}).sort();
+                  // load existing permissions for this field
+                  const permsSnap = await new Promise((resolve)=>{ onValue(ref(db, '/boards/' + bid + '/customFields/' + k + '/permissions'), s => resolve(s), { onlyOnce: true }); });
+                  const perms = (permsSnap && permsSnap.val()) || {};
+                  const canView = perms.canView || {};
+                  const canUse = perms.canUse || {};
+                  permsPanel.innerHTML = '';
+                  const hint = document.createElement('div'); hint.className='hint'; hint.textContent = 'Select which users can view this field and which can use/edit it.'; permsPanel.appendChild(hint);
+                  // header row for permission columns
+                  const permsHeader = document.createElement('div'); permsHeader.style.display='flex'; permsHeader.style.alignItems='center'; permsHeader.style.gap='8px'; permsHeader.style.marginTop='8px';
+                  const nameHdr = document.createElement('div'); nameHdr.textContent = 'User'; nameHdr.style.width = '160px'; nameHdr.style.fontWeight = '600';
+                  const viewHdr = document.createElement('div'); viewHdr.textContent = 'Can view'; viewHdr.style.width = '80px'; viewHdr.style.fontWeight = '600';
+                  const useHdr = document.createElement('div'); useHdr.textContent = 'Can use'; useHdr.style.width = '80px'; useHdr.style.fontWeight = '600';
+                  permsHeader.appendChild(nameHdr); permsHeader.appendChild(viewHdr); permsHeader.appendChild(useHdr);
+                  permsPanel.appendChild(permsHeader);
+                  if(users.length === 0){ const none = document.createElement('div'); none.style.color='#900'; none.textContent = 'No users found.'; permsPanel.appendChild(none); }
+                  // render table-like rows
+                  users.forEach(u => {
+                    const rowU = document.createElement('div'); rowU.style.display='flex'; rowU.style.alignItems='center'; rowU.style.gap='8px'; rowU.style.marginTop='6px';
+                    const name = document.createElement('div'); name.textContent = u; name.style.width = '160px'; rowU.appendChild(name);
+                    const viewDiv = document.createElement('div'); const vcb = document.createElement('input'); vcb.type='checkbox'; vcb.checked = !!canView[u]; viewDiv.appendChild(vcb); rowU.appendChild(viewDiv);
+                    const useDiv = document.createElement('div'); const ucb = document.createElement('input'); ucb.type='checkbox'; ucb.checked = !!canUse[u]; useDiv.appendChild(ucb); rowU.appendChild(useDiv);
+                    // write handler for toggles
+                    vcb.addEventListener('change', async ()=>{
+                      try{
+                        // write minimal change
+                        const p = {};
+                        p['/boards/' + bid + '/customFields/' + k + '/permissions/canView/' + u] = !!vcb.checked;
+                        await update(ref(db, '/'), p);
+                      }catch(err){ console.warn('Failed to save permission', err); alert('Failed to save permission (see console)'); }
+                    });
+                    ucb.addEventListener('change', async ()=>{
+                      try{
+                        const p = {};
+                        p['/boards/' + bid + '/customFields/' + k + '/permissions/canUse/' + u] = !!ucb.checked;
+                        await update(ref(db, '/'), p);
+                      }catch(err){ console.warn('Failed to save permission', err); alert('Failed to save permission (see console)'); }
+                    });
+                    permsPanel.appendChild(rowU);
+                  });
+                  // quick controls
+                  const controls = document.createElement('div'); controls.style.marginTop='8px'; controls.style.display='flex'; controls.style.gap='8px';
+                  const selectAllView = document.createElement('button'); selectAllView.className='btn ghost'; selectAllView.textContent='Allow all to view';
+                  const clearAllView = document.createElement('button'); clearAllView.className='btn ghost'; clearAllView.textContent='Clear view';
+                  selectAllView.addEventListener('click', async ()=>{
+                    try{ const upd = {}; users.forEach(u=> upd['/boards/' + bid + '/customFields/' + k + '/permissions/canView/' + u] = true); await update(ref(db,'/'), upd); // refresh
+                      permsBtn.click(); permsBtn.click();
+                    }catch(e){ console.warn(e); }
+                  });
+                  clearAllView.addEventListener('click', async ()=>{ try{ const upd = {}; users.forEach(u=> upd['/boards/' + bid + '/customFields/' + k + '/permissions/canView/' + u] = null); await update(ref(db,'/'), upd); permsBtn.click(); permsBtn.click(); }catch(e){ console.warn(e); } });
+                  controls.appendChild(selectAllView); controls.appendChild(clearAllView);
+                  permsPanel.appendChild(controls);
+                  // Category visibility controls
+                  try{
+                    const catTitle = document.createElement('div'); catTitle.style.marginTop='10px'; catTitle.style.fontWeight='600'; catTitle.textContent = 'Visible in categories'; permsPanel.appendChild(catTitle);
+                    const catsSnap = await new Promise((resolve)=>{ onValue(ref(db, '/boards/' + bid + '/categories'), s => resolve(s), { onlyOnce: true }); });
+                    const cats = (catsSnap && catsSnap.val()) || {};
+                    const catKeys = Object.keys(cats || {});
+            if(catKeys.length === 0){ const none = document.createElement('div'); none.style.color='#666'; none.textContent = 'No categories defined for this board.'; permsPanel.appendChild(none); }
+                    else {
+              const catContainer = document.createElement('div'); catContainer.style.display='flex'; catContainer.style.flexDirection='column'; catContainer.style.gap='6px'; catContainer.style.marginTop='6px';
+              // header for category visibility
+              const catHeader = document.createElement('div'); catHeader.style.display='flex'; catHeader.style.justifyContent='space-between'; catHeader.style.alignItems='center'; catHeader.style.marginBottom='6px';
+              const catLabelHdr = document.createElement('div'); catLabelHdr.textContent = 'Category'; catLabelHdr.style.fontWeight='600';
+              const catVisHdr = document.createElement('div'); catVisHdr.textContent = 'Visible'; catVisHdr.style.fontWeight='600'; catHeader.appendChild(catLabelHdr); catHeader.appendChild(catVisHdr); permsPanel.appendChild(catHeader);
+                      catKeys.forEach(ck => {
+                        const rowC = document.createElement('div'); rowC.style.display='flex'; rowC.style.alignItems='center'; rowC.style.gap='8px';
+                        const label = document.createElement('div'); label.textContent = (cats[ck] && cats[ck].title) ? cats[ck].title : ck; label.style.flex='1';
+                        const vcb = document.createElement('input'); vcb.type='checkbox'; vcb.checked = !!((perms && perms.visibility && perms.visibility.categories && perms.visibility.categories[ck]));
+                        vcb.addEventListener('change', async ()=>{
+                          try{ const upd = {}; upd['/boards/' + bid + '/customFields/' + k + '/visibility/categories/' + ck] = !!vcb.checked; await update(ref(db, '/'), upd); }catch(e){ console.warn('Failed to update category visibility', e); alert('Failed to save (see console)'); }
+                        });
+                        rowC.appendChild(label); rowC.appendChild(vcb); catContainer.appendChild(rowC);
+                      });
+                      // quick controls
+                      const catControls = document.createElement('div'); catControls.style.marginTop='8px'; catControls.style.display='flex'; catControls.style.gap='8px';
+                      const allowAll = document.createElement('button'); allowAll.className='btn ghost'; allowAll.textContent='Allow in all categories';
+                      const clearAllCats = document.createElement('button'); clearAllCats.className='btn ghost'; clearAllCats.textContent='Clear all';
+                      allowAll.addEventListener('click', async ()=>{ try{ const upd = {}; catKeys.forEach(ck=> upd['/boards/' + bid + '/customFields/' + k + '/visibility/categories/' + ck] = true); await update(ref(db,'/'), upd); permsBtn.click(); permsBtn.click(); }catch(e){ console.warn(e); } });
+                      clearAllCats.addEventListener('click', async ()=>{ try{ const upd = {}; catKeys.forEach(ck=> upd['/boards/' + bid + '/customFields/' + k + '/visibility/categories/' + ck] = null); await update(ref(db,'/'), upd); permsBtn.click(); permsBtn.click(); }catch(e){ console.warn(e); } });
+                      catControls.appendChild(allowAll); catControls.appendChild(clearAllCats);
+                      permsPanel.appendChild(catContainer); permsPanel.appendChild(catControls);
+                    }
+                  }catch(e){ console.warn('Failed to render category visibility controls', e); }
+                }catch(e){ console.warn('Failed to open permissions panel', e); permsPanel.innerHTML = '<div style="color:#900">Failed to load permissions</div>'; }
+              });
+
+              listDiv.appendChild(row);
+            });
+          }catch(e){ listDiv.innerHTML = '<div style="color:#900">Failed to load custom fields</div>'; }
+          addBtn.addEventListener('click', async ()=>{
+            const label = (labelInput.value||'').trim(); if(!label) return alert('Enter a label');
+            const type = typeSel.value; const id = 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+            const obj = { id, label, type, createdAt: Date.now() };
+            try{ await set(ref(db, '/boards/' + bid + '/customFields/' + id), obj); const row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.alignItems='center'; row.style.marginTop='8px'; const title = document.createElement('div'); title.textContent = label + ' (' + type + ')'; title.style.flex='1'; const del = document.createElement('button'); del.className='btn ghost'; del.textContent='Delete'; del.addEventListener('click', async ()=>{ try{ await set(ref(db, '/boards/' + bid + '/customFields/' + id), null); row.remove(); }catch(e){ alert('Failed to delete: ' + e.message); } }); row.appendChild(title); row.appendChild(del); listDiv.appendChild(row); labelInput.value=''; }catch(e){ alert('Failed to save field: ' + (e && e.message)); }
+          });
+        }catch(err){ console.warn('Failed to render custom fields', err); }
+      });
+    }
+    openCats.addEventListener('click', async ()=>{
+      await ensureModules();
+      // Render a consolidated Manage Categories UI into the admin settings area
+      try{
+        await renderManageCategoriesUI();
+        showAdminPanel('categoryUploadSettings');
+        // ensure Category Uploads button isn't shown as active
+        try{ const cb = document.getElementById('openCategoryUploads'); if(cb) cb.classList.remove('primary'); }catch(e){}
+        log('Opened Manage Categories (all boards)');
+      }catch(err){ log('Failed to open Manage Categories: ' + (err && err.message ? err.message : String(err))); }
+    });
+
+    // Helper: slugify a category name into a safe key
+    function slugify(str){ return String(str || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'cat-' + Math.random().toString(36).slice(2,6); }
+
+    // Fetch boards once. Prefer the app's boards helper when available, then
+    // try /boards_meta (where board metadata is stored), and finally fall back
+    // to /boards for legacy installs.
+    async function fetchBoardsOnce(){
+      // prefer window._BOARDS.getAll when available (returns map id->meta)
+      try{
+        if(window._BOARDS && window._BOARDS.getAll){
+          const map = await window._BOARDS.getAll();
+          return Object.keys(map || {}).map(k => map[k]);
+        }
+      }catch(e){ /* ignore and fallback */ }
+      // try /boards_meta where boards.js stores metadata
+      try{
+        return await new Promise((resolve)=>{
+          onValue(ref(db,'/boards_meta'), snap => {
+            const val = snap.val() || {};
+            const list = Object.keys(val || {}).map(k => Object.assign({ id: k }, (val[k] || {})));
+            resolve(list);
+          }, { onlyOnce: true });
+        });
+      }catch(e){ /* ignore */ }
+      // legacy fallback: /boards
+      return new Promise((resolve)=>{
+        onValue(ref(db,'/boards'), snap => {
+          const val = snap.val() || {};
+          const list = Object.keys(val || {}).map(k => Object.assign({ id: k }, (val[k] || {})));
+          resolve(list);
+        }, { onlyOnce: true });
+      });
+    }
+
+    // Render the manage-categories UI into #categoryUploadSettings
+    async function renderManageCategoriesUI(){
+      const container = document.getElementById('categoryUploadSettings');
+      if(!container) return;
+      container.innerHTML = '';
+      const title = document.createElement('h3'); title.textContent = 'Manage Categories (All Boards)'; container.appendChild(title);
+
+  let boards = await fetchBoardsOnce();
+  // Exclude the special 'default' board from admin management UI
+  boards = (boards || []).filter(b => (b && (b.id || b) ) !== 'default');
+  if(!boards || boards.length===0){ container.innerHTML += '<div style="color:#900">No boards found.</div>'; return; }
+
+      // Add category input + board selector
+      const addRow = document.createElement('div'); addRow.style.display='flex'; addRow.style.gap='8px'; addRow.style.alignItems='center'; addRow.style.marginBottom='12px';
+      const nameWrap = document.createElement('div'); nameWrap.style.flex='1'; nameWrap.style.display='flex'; nameWrap.style.flexDirection='column';
+      const nameLabel = document.createElement('div'); nameLabel.textContent = 'Category name'; nameLabel.style.fontSize='13px'; nameLabel.style.marginBottom='6px';
+      const nameIn = document.createElement('input'); nameIn.placeholder='New category name'; nameIn.style.padding='8px'; nameIn.style.flex='1'; nameIn.style.borderRadius='8px'; nameIn.style.border='1px solid rgba(15,23,42,0.06)';
+      nameWrap.appendChild(nameLabel); nameWrap.appendChild(nameIn);
+      addRow.appendChild(nameWrap);
+      const boardsSelector = document.createElement('div'); boardsSelector.style.display='flex'; boardsSelector.style.gap='8px'; boardsSelector.style.flexWrap='wrap'; boardsSelector.style.maxWidth='360px';
+      const boardsLabel = document.createElement('div'); boardsLabel.textContent = 'Add to boards'; boardsLabel.style.fontSize='13px'; boardsLabel.style.marginBottom='6px';
+      const boardsWrap = document.createElement('div'); boardsWrap.style.display='flex'; boardsWrap.style.flexDirection='column'; boardsWrap.appendChild(boardsLabel); boardsWrap.appendChild(boardsSelector);
+      boards.forEach(b => {
+        const cb = document.createElement('label'); cb.style.display='inline-flex'; cb.style.alignItems='center'; cb.style.gap='6px'; cb.style.fontSize='13px'; cb.style.marginRight='6px';
+        const input = document.createElement('input'); input.type='checkbox'; input.value = b.id; input.checked = true;
+        cb.appendChild(input); cb.appendChild(document.createTextNode((b.title || b.name) || b.id)); boardsSelector.appendChild(cb);
+      });
+      addRow.appendChild(boardsWrap);
+      const addBtn = document.createElement('button'); addBtn.className='btn primary'; addBtn.textContent='Add to selected boards'; addRow.appendChild(addBtn);
+      container.appendChild(addRow);
+
+      // Area to list boards and their categories
+      const listArea = document.createElement('div'); listArea.style.display='grid'; listArea.style.gridTemplateColumns='repeat(auto-fit,minmax(260px,1fr))'; listArea.style.gap='12px'; container.appendChild(listArea);
+
+      // Function to refresh per-board categories display
+      async function refreshBoards(){ listArea.innerHTML = '';
+        for(const b of boards){
+          const box = document.createElement('div'); box.style.background='linear-gradient(180deg,#fff,#fbfdff)'; box.style.padding='10px'; box.style.borderRadius='10px'; box.style.border='1px solid rgba(15,23,42,0.03)';
+          const hdr = document.createElement('div'); hdr.style.display='flex'; hdr.style.justifyContent='space-between'; hdr.style.alignItems='center'; hdr.style.marginBottom='8px';
+          const title = document.createElement('strong'); title.textContent = (b.title || b.name) || b.id; hdr.appendChild(title);
+          const idspan = document.createElement('span'); idspan.style.fontSize='12px'; idspan.style.color='var(--muted)'; idspan.textContent = b.id; hdr.appendChild(idspan);
+          box.appendChild(hdr);
+          // fetch categories once for this board
+          const cats = await new Promise((resolve)=>{ onValue(ref(db, '/boards/' + b.id + '/categories'), snap => { resolve(snap.val() || {}); }, { onlyOnce: true }); });
+          const keys = Object.keys(cats || {});
+          if(keys.length === 0){ const none = document.createElement('div'); none.style.color='var(--muted)'; none.textContent = 'No categories'; box.appendChild(none); }
+          else{
+            const ul = document.createElement('div'); ul.style.display='flex'; ul.style.flexDirection='column'; ul.style.gap='6px';
+            keys.forEach(k => {
+              const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center';
+              const t = (cats[k] && cats[k].title) ? cats[k].title : k;
+              const label = document.createElement('span'); label.textContent = t; row.appendChild(label);
+              const del = document.createElement('button'); del.className='btn ghost'; del.style.padding='6px 8px'; del.textContent='Delete';
+              del.addEventListener('click', async ()=>{
+                if(!confirm('Delete category "' + t + '" from board "' + ((b.title||b.name)||b.id) + '"?')) return;
+                try{ await set(ref(db, '/boards/' + b.id + '/categories/' + k), null); log('Deleted category ' + t + ' from ' + b.id); await refreshBoards(); }catch(e){ console.warn(e); }
+              });
+              row.appendChild(del);
+              ul.appendChild(row);
+            });
+            box.appendChild(ul);
+          }
+          listArea.appendChild(box);
+        }
+      }
+
+      addBtn.addEventListener('click', async ()=>{
+        const name = (nameIn.value || '').trim(); if(!name){ alert('Enter a category name'); return; }
+        const selectedBoardIds = Array.from(boardsSelector.querySelectorAll('input[type=checkbox]:checked')).map(i=>i.value);
+        if(selectedBoardIds.length === 0){ alert('Select at least one board'); return; }
+        const key = slugify(name);
+        try{
+          for(const bid of selectedBoardIds){
+            // write minimal category object; preserve existing if present
+            await set(ref(db, '/boards/' + bid + '/categories/' + key), { title: name, uploadable: false });
+            log('Added category ' + name + ' to ' + bid);
+          }
+          nameIn.value = '';
+          await refreshBoards();
+        }catch(e){ console.warn('Failed to add category', e); alert('Failed to add category'); }
+      });
+
+      // initial load
+      await refreshBoards();
+    }
+    // Manage Boards - lazy-load boards module and dispatch a custom event
+    const openBoardsBtn = document.getElementById('openBoards');
+    if(openBoardsBtn){
+      openBoardsBtn.addEventListener('click', async ()=>{
+        try{
+          await tryImportWithFallback(['/boards.js','../boards.js','./boards.js']);
+          // dispatch boards-manage so boards.js (if it has UI) can open a manager
+          window.dispatchEvent(new CustomEvent('boards-manage'));
+          log('Opened Manage Boards');
+        }catch(err){ log('Failed to open boards manager: ' + (err && err.message ? err.message : String(err))); }
+      });
+    }
+
+    // also reflect external events in the log/status
+    window.addEventListener('users-updated', (e)=>{
+      log('Users updated (' + Object.keys((e.detail && e.detail.users) || {}).length + ')');
+    });
+    window.addEventListener('categories-updated', (e)=>{
+      log('Categories updated (' + (e.detail && e.detail.categories ? e.detail.categories.length : 0) + ')');
+    });
+
+    // enable boards button when admin auth is signalled from elsewhere
+    window.addEventListener('admin-auth-success', (e)=>{
+      try{
+        const u = e?.detail?.username;
+        if(u){
+          // enable admin buttons
+          const openBoards = document.getElementById('openBoards'); if(openBoards) openBoards.disabled = false;
+          const openUsersBtn = document.getElementById('openUsers'); if(openUsersBtn) openUsersBtn.disabled = false;
+          const openCatsBtn = document.getElementById('openCats'); if(openCatsBtn) openCatsBtn.disabled = false;
+          const openCommentBtn = document.getElementById('openCommentSettings'); if(openCommentBtn) openCommentBtn.disabled = false;
+          // reveal the main admin panel and board picker, hide the login modal
+          try{ document.querySelector('.panel').style.display = 'block'; }catch(e){}
+          try{ const picker = document.querySelector('.board-picker'); if(picker) picker.style.display = 'block'; }catch(e){}
+          try{ const modal = document.getElementById('adminLoginModal'); if(modal) modal.style.display = 'none'; }catch(e){}
+        }
+      }catch(err){/* ignore */}
+    });
+
+    // enable comment settings button when admin auth succeeds
+    window.addEventListener('admin-auth-success', (e)=>{
+      try{ const u = e?.detail?.username; if(u){ const btn = document.getElementById('openCommentSettings'); if(btn) btn.disabled = false; } }catch(err){}
+    });
+
+  // Hide placeholder when Users manager opens, restore when closed
+  window.addEventListener('users-opened', ()=>{ try{ const ph = document.getElementById('adminPlaceholder'); if(ph) ph.style.display = 'none'; }catch(e){} });
+  window.addEventListener('users-closed', ()=>{ try{ const ph = document.getElementById('adminPlaceholder'); if(ph) ph.style.display = 'block'; }catch(e){} });
+
+    // mark categories module loaded when imported (categories.js doesn't set a flag)
+    // intercept import to set a flag
+    try{ // no-op
+    }catch(e){}
+    // Floating board picker logic
+    (function setupBoardPicker(){
+      // create elements
+      const pickerRoot = document.createElement('div'); pickerRoot.className = 'board-picker';
+      pickerRoot.innerHTML = `
+        <button class="picker-btn" id="boardPickerBtn" title="Select board">B</button>
+        <div class="picker-menu" id="boardPickerMenu" role="menu" aria-hidden="true"></div>
+      `;
+      document.body.appendChild(pickerRoot);
+
+      const btn = document.getElementById('boardPickerBtn');
+      const menu = document.getElementById('boardPickerMenu');
+
+      function closeMenu(){ menu.style.display = 'none'; menu.setAttribute('aria-hidden','true'); btn.classList.remove('active'); }
+      function openMenu(){ menu.style.display = 'block'; menu.setAttribute('aria-hidden','false'); btn.classList.add('active'); }
+
+      btn.addEventListener('click', async (ev)=>{
+        ev.stopPropagation();
+        if(menu.style.display === 'block'){ closeMenu(); return; }
+        // populate menu
+        try{
+          menu.innerHTML = '<div class="item" style="opacity:0.8;padding:8px 12px">Loading…</div>';
+          await ensureModules();
+          await new Promise((resolve)=>{
+            onValue(ref(db, '/boards'), snap => {
+              const val = snap.val() || {};
+              const list = Object.keys(val || {}).map(k => Object.assign({ id: k }, (val[k] || {})));
+              if(list.length === 0){ menu.innerHTML = '<div class="item">No boards found</div>'; resolve(); return; }
+              menu.innerHTML = '';
+              const current = currentBoardId();
+              list.forEach(b => {
+                const title = (b && (b.title || b.name)) ? (b.title || b.name) : b.id || b;
+                const it = document.createElement('div'); it.className = 'item';
+                it.innerHTML = `<span class="title">${title}</span><span class="current">${b.id === current ? 'Selected' : ''}</span>`;
+                it.addEventListener('click', ()=>{
+                  try{ localStorage.setItem('kanban_selected_board', b.id); closeMenu(); log('Selected board ' + (b.id || title)); }catch(e){}
+                });
+                menu.appendChild(it);
+              });
+              resolve();
+            }, { onlyOnce: true });
+          });
+        }catch(err){ menu.innerHTML = '<div class="item">Failed to load boards</div>'; }
+        openMenu();
+      });
+
+      // close on outside click
+      document.addEventListener('click', ()=> closeMenu());
+      // keep menu open when clicking inside
+      menu.addEventListener('click', (ev)=> ev.stopPropagation());
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+*{box-sizing:border-box;font-family:Inter, Roboto, Arial, sans-serif}
+:root{--bg:#f4f6f8;--col:#eef2f6;--accent:#2b7cff;--card:#ffffff}
+body{margin:0;background:var(--bg);color:#0b1220}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:linear-gradient(90deg,#fff,#f7fafc);border-bottom:1px solid #e6eef8}
+header h1{margin:0;font-size:20px}
+.left-controls{display:flex;align-items:center;gap:12px}
+.left-controls #createTaskBtn{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+.left-controls #createTaskBtn strong{margin-left:6px}
+.controls{display:flex;gap:8px;align-items:center}
+.user-avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-right:8px;font-size:14px}
+.controls input[type="text"]{padding:8px;border-radius:6px;border:1px solid #d8e2ee}
+.controls button{padding:8px 10px;border-radius:6px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+.board{display:flex;gap:12px;padding:20px;align-items:flex-start;overflow:auto;height:calc(100vh - 84px)}
+.column{flex:0 0 260px;border-radius:8px;padding:12px;display:flex;flex-direction:column;max-height:100%;
+	/* frosted glass effect: semi-transparent tint + blur backdrop */
+	background: rgba(255,255,255,0.6);
+	border: 1px solid rgba(255,255,255,0.6);
+	box-shadow: 0 6px 18px rgba(8,20,40,0.04), inset 0 1px 0 rgba(255,255,255,0.6);
+	backdrop-filter: blur(8px) saturate(120%);
+	-webkit-backdrop-filter: blur(8px) saturate(120%);
+}
+.column h2{margin:0 0 8px 0;font-size:14px}
+.column .count{font-size:12px;color:#5b6b80;margin-left:8px}
+.column .dropzone{flex:1;overflow:auto;padding:8px;min-height:60px;border-radius:6px}
+.card{background:var(--card);padding:10px;border-radius:8px;margin-bottom:8px;box-shadow:0 1px 2px rgba(8,20,40,0.04);display:flex;justify-content:space-between;align-items:center;cursor:grab}
+.card[dragging]{opacity:0.6}
+
+/* Floating drag ghost used on touch devices */
+.drag-ghost{position:fixed;pointer-events:none;z-index:12000;left:0;top:0;transform:translate(-50%,-50%);box-shadow:0 18px 48px rgba(2,6,23,0.18);border-radius:10px;opacity:0.98;background:var(--card);padding:8px;display:block;align-items:center;gap:8px;max-width:90%;border:1px solid rgba(2,6,23,0.06)}
+.drag-ghost .delete{display:none}
+.card-title{flex:1;padding-right:8px}
+.card-actions button{background:transparent;border:0;color:#b02a37;font-size:14px;cursor:pointer}
+.footer{padding:12px;text-align:center;color:#6b7b90}
+@media (max-width:800px){.column{flex:1 0 200px}}
+
+/* Ensure hamburger menu buttons show pointer and are clickable even if other stacking contexts exist */
+/* Raise the hamburger menu above other UI so it reliably receives pointer events.
+	NOTE: this intentionally uses a very high z-index so it wins over overlays that
+	were previously intercepting clicks during testing. If you prefer maintenance
+	overlays to cover the menu, we can tune this to a lower value and instead
+	adjust the overlay behavior. */
+#hamburger-wrapper { position: relative; z-index: 11000; -webkit-user-select:none; user-select:none }
+#hamburgerMenu{z-index:11001;position:absolute}
+#hamburgerMenu button{cursor:pointer;pointer-events:auto;user-select:none}
+#hamburgerBtn{cursor:pointer}
+
+/* When the hamburger menu is open, prevent the board/columns from capturing pointer events
+	so the menu buttons are reliably clickable even if category UI overlaps visually. */
+.hamburger-open .board,
+.hamburger-open .column,
+.hamburger-open .dropzone { pointer-events: none !important; }
+.hamburger-open #hamburgerMenu { pointer-events: auto !important; }
+
+/* Modal styles */
+.modal{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:40}
+.modal-panel{background:#fff;border-radius:10px;padding:18px;box-shadow:0 12px 40px rgba(2,6,23,0.25);max-width:880px;width:90%;max-height:88vh;overflow:auto}
+.details-panel{display:flex;flex-direction:column;gap:12px}
+.details-header{display:flex;align-items:center;justify-content:space-between}
+.details-header h2{margin:0;font-size:20px}
+.modal-close-button{background:transparent;border:0;font-size:18px;cursor:pointer}
+.details-meta{display:flex;justify-content:space-between;gap:12px}
+.meta-left,.meta-right{display:flex;flex-direction:column;gap:6px}
+.meta-item{font-size:13px;color:#333}
+.badge{display:inline-block;padding:6px 8px;background:#eef2f6;border-radius:6px;margin-top:6px}
+.muted{color:#556; margin-top:6px}
+.details-desc{padding:12px;border-radius:8px;background:#fbfdff;border:1px solid #eef4fb;color:#223;white-space:pre-wrap;word-break:break-word}
+.details-footer{display:flex;justify-content:space-between;align-items:center}
+.created-info{font-size:12px;color:#889}
+
+/* Creator color accent: a left stripe on the card */
+.card{--creator-color: transparent;position:relative;padding-left:16px}
+.card.has-creator-color::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:6px;border-radius:4px;background:var(--creator-color);}
+
+/* Attachments box styling */
+#attachmentsList { padding: 8px 0; }
+#attachmentsList > div { margin: 0; }
+.attachment-box { border: 1px solid #e6eef8; border-radius:8px; padding:10px; background:#fff; }
+.attachment-box .file-name { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.attachment-box .file-meta { font-size:12px; color:#666; }
+.attachment-box button { cursor:pointer }
+
+.attachments > h4 { margin-bottom:8px }
+#attachmentsList > div { margin-bottom: 12px }
+#attachmentsList > div:nth-child(odd) { border-left: 3px solid transparent }
+
+/* Comments */
+#commentsList { padding: 8px 0; }
+.comment { padding:10px;border-radius:8px;border:1px solid #e6eef8;background:#fff;margin-bottom:8px;display:flex;gap:8px }
+.comment .avatar { width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;background:#eef2ff;color:#123;padding:4px }
+.comment .body { flex:1 }
+.comment .meta { font-size:12px;color:#667;margin-bottom:6px }
+.comment .text { white-space:pre-wrap;color:#222 }
+.comment .delete-comment { background:transparent;border:0;color:#b02a37;cursor:pointer }
+
+/* Hide upload (Attach PDF) and ADMIN menu button on small screens (phones) */
+@media (max-width: 600px) {
+	/* Hide the Attach PDF button in the details modal */
+	#attachBtn { display: none !important; }
+
+	/* Hide the ADMIN button in the hamburger menu */
+	#menuAdmin { display: none !important; }
+
+	/* Also hide related upload elements to avoid awkward layout on very small screens */
+	#attachmentInput, #attachmentStatus { display: none !important; }
+	/* Hide the attachments list and any attachment boxes so uploaded files are not shown on phones */
+	.attachments, #attachmentsList, .attachment-box { display: none !important; }
+
+	/* Responsive header adjustments */
+	header{padding:10px 12px}
+	.left-controls{gap:8px;align-items:center;flex-wrap:wrap}
+	.left-controls #createTaskBtn{padding:6px 8px;font-size:14px;border-radius:8px}
+	header h1{font-size:16px;margin:6px 0}
+	#currentUserDisplay{display:none}
+	/* Keep board selector available on mobile but compact */
+	#boardSelector{display:inline-block !important; max-width:140px !important; font-size:13px; padding:6px;border-radius:6px;border:1px solid #ddd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+	.controls{gap:6px}
+	.user-avatar{width:32px;height:32px}
+
+	/* Make hamburger menu popup fixed and always on top on small screens */
+	#hamburgerMenu{position:fixed !important; right:12px !important; top:56px !important; z-index:15000 !important;}
+	.hamburger-wrapper{z-index:15001 !important}
+}
+
+/* Ensure hamburger menu is above other UI globally and style it to match site UI */
+#hamburgerMenu{
+	position:fixed !important;
+	z-index:16000 !important;
+	/* visual appearance aligned with modals and primary UI */
+	background: linear-gradient(180deg,#fff,#fbfdff);
+	border: 1px solid #e6eef8;
+	padding: 8px;
+	border-radius: 10px;
+	min-width: 160px;
+	box-shadow: 0 12px 36px rgba(2,6,23,0.12);
+	font-size: 14px;
+	color: #122;
+}
+
+#hamburgerMenu button{
+	display:block;
+	width:100%;
+	text-align:left;
+	padding:8px 10px;
+	border-radius:8px;
+	border:1px solid transparent;
+	background:transparent;
+	color:#123;
+	font-weight:600;
+	cursor:pointer;
+}
+
+#hamburgerMenu button:hover{
+	background: rgba(43,124,255,0.06);
+	border-color: rgba(43,124,255,0.08);
+}
+
+#hamburgerMenu button:active{ background: rgba(43,124,255,0.10); }
+
+/* highlight admin/menu primary action slightly using accent color */
+#hamburgerMenu button#menuAdmin{ color: var(--accent); }
+.hamburger-wrapper{z-index:16001 !important}
+
+/* Debug console styles */
+#debugConsole{max-height:360px;overflow:auto;padding:6px;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid #eef4fb;font-family:monospace;font-size:12px}
+.dbg-entry{padding:6px;border-bottom:1px solid rgba(2,6,23,0.03);white-space:pre-wrap;word-break:break-word}
+.dbg-log{color:#0b1220}
+.dbg-info{color:#0b6bff}
+.dbg-warn{color:#b97700}
+.dbg-error{color:#b02a37}
+#hamburgerMenu .dbg-controls button { margin-left:6px; padding:6px 8px; border-radius:6px; border:1px solid rgba(2,6,23,0.04); background:transparent; cursor:pointer; }

@@ -1,0 +1,19 @@
+{
+  "name": "AMB Job Board",
+  "short_name": "JobBoard",
+  "description": "A lightweight job/kanban board — installable as a Progressive Web App.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#2b7cff",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#2b7cff" />
   <title>Job Board - Kanban</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="icons/icon.svg" />
   <link rel="stylesheet" href="style.css" />
   <style>
     /* Page background using AMB-BG.png with a subtle light overlay for readability */
@@ -327,6 +330,29 @@
         btn.style.display = (cu && cu.username === 'admin') ? '' : 'none';
       }catch(e){ btn.style.display = 'none'; }
     })();
+  </script>
+  <script>
+    // Register the service worker (if supported)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+          console.log('Service worker registered.', reg);
+        }).catch(function(err) {
+          console.warn('Service worker registration failed:', err);
+        });
+      });
+    }
+
+    // Optional: capture beforeinstallprompt to show a custom install UI later
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later
+      window.deferredInstallPrompt = e;
+      // You could show an install button in the UI and call:
+      // window.deferredInstallPrompt.prompt();
+      console.log('beforeinstallprompt captured; use window.deferredInstallPrompt.prompt() to show it.');
+    });
   </script>
 </body>
 </html>

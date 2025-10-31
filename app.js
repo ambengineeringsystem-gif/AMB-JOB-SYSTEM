@@ -682,7 +682,29 @@ function createCardNode(card){
         try{
           if(touchState.currentDrop){
             const toCol = touchState.currentDrop.dataset && touchState.currentDrop.dataset.col;
-            if(toCol && toCol !== card.column){ try{ moveCard(card.id, toCol); }catch(e){ console.warn('touch drop move failed', e); } }
+            if(toCol && toCol !== card.column){
+              try{
+                // pre-validate state and columns to avoid calling moveCard when internal data is inconsistent
+                // ensure state has arrays for all known columns
+                try{ if(Array.isArray(COLUMNS)){ COLUMNS.forEach(c=> { if(!Array.isArray(state[c])) state[c] = []; }); } }catch(e){}
+                // find the card and its current column safely
+                let foundCol = null, foundIdx = -1;
+                try{
+                  for(const sc of Object.keys(state || {})){
+                    if(!Array.isArray(state[sc])) continue;
+                    const i = state[sc].findIndex(x => x && x.id === card.id);
+                    if(i !== -1){ foundCol = sc; foundIdx = i; break; }
+                  }
+                }catch(e){ foundCol = null; foundIdx = -1; }
+                if(foundIdx === -1){ console.warn('touch drop: card not found in local state, skipping move'); }
+                else {
+                  // ensure destination column exists
+                  if(!Array.isArray(state[toCol])) state[toCol] = [];
+                  // perform the move using the existing moveCard helper inside try/catch
+                  try{ moveCard(card.id, toCol); }catch(e){ console.warn('touch drop move failed', e); }
+                }
+              }catch(e){ console.warn('touch drop validation failed', e); }
+            }
             try{ touchState.currentDrop.classList.remove('dragover'); }catch(e){}
           }
         }catch(e){}
@@ -1346,6 +1368,7 @@ function findUser(usersMap, username){
 
 function addCard(title, col = COLUMNS[0]){
   const id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  if(!Array.isArray(state[col])) state[col] = [];
   const card = {id, title, created: Date.now(), column: col, order: (state[col] || []).length, board: currentBoardId()};
   state[col].push(card);
   save();
@@ -1356,9 +1379,15 @@ function addCard(title, col = COLUMNS[0]){
 
 function moveCard(cardId, toCol){
   for(const col of COLUMNS){
-    const idx = state[col].findIndex(c => c.id === cardId);
+    // guard against missing column arrays in state
+    const colArr = Array.isArray(state[col]) ? state[col] : [];
+    const idx = colArr.findIndex(c => c.id === cardId);
     if(idx !== -1){
+      // ensure the source column exists as an array before splicing
+      if(!Array.isArray(state[col])) state[col] = colArr;
       const [card] = state[col].splice(idx,1);
+      // ensure destination column exists
+      if(!Array.isArray(state[toCol])) state[toCol] = [];
       // update card metadata
       card.column = toCol;
       state[toCol].push(card);
@@ -1377,6 +1406,7 @@ function moveCard(cardId, toCol){
 
 function deleteCard(cardId){
   for(const col of COLUMNS){
+    if(!Array.isArray(state[col])) continue;
     const idx = state[col].findIndex(c => c.id === cardId);
     if(idx !== -1){
       state[col].splice(idx,1);

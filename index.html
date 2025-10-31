@@ -62,7 +62,9 @@
     </div>
   </template>
 
-  <div id="status" style="position:fixed;right:12px;bottom:12px;padding:6px 10px;background:#222;color:#fff;border-radius:6px;font-size:12px;opacity:0.9">Offline</div>
+  <!-- Debug console toggle (replaces previous offline status) -->
+  <div id="debugButton" class="debug-button" aria-label="Debug console" title="Toggle debug console">🐞</div>
+  <div id="debugConsole" class="debug-console" style="display:none" aria-hidden="true"></div>
   <!-- Create Task modal (hidden) -->
   <div id="createModal" class="modal" style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
     <div class="modal-panel" style="background:#fff;border-radius:8px;padding:16px;max-width:520px;margin:40px auto;box-shadow:0 8px 30px rgba(0,0,0,0.2);">

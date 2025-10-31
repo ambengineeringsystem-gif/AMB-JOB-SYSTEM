@@ -160,11 +160,70 @@ header h1{margin:0;font-size:20px}
 #hamburgerMenu button#menuAdmin{ color: var(--accent); }
 .hamburger-wrapper{z-index:16001 !important}
 
-/* Debug console styles */
-#debugConsole{max-height:360px;overflow:auto;padding:6px;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid #eef4fb;font-family:monospace;font-size:12px}
-.dbg-entry{padding:6px;border-bottom:1px solid rgba(2,6,23,0.03);white-space:pre-wrap;word-break:break-word}
-.dbg-log{color:#0b1220}
-.dbg-info{color:#0b6bff}
-.dbg-warn{color:#b97700}
-.dbg-error{color:#b02a37}
-#hamburgerMenu .dbg-controls button { margin-left:6px; padding:6px 8px; border-radius:6px; border:1px solid rgba(2,6,23,0.04); background:transparent; cursor:pointer; }
+/* Debug console button (replaces `#status`) */
+.debug-button{
+	position:fixed;
+	right:12px;
+	bottom:12px;
+	/* slightly smaller but still tappable */
+	width:28px;
+	height:28px;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	background:#111;
+	color:#fff;
+	border-radius:6px;
+	font-size:12px;
+	line-height:1;
+	opacity:0.98;
+	cursor:pointer;
+	z-index:20000;
+	box-shadow:0 8px 18px rgba(2,6,23,0.16);
+	border:1px solid rgba(255,255,255,0.04);
+}
+.debug-button:hover{ transform:translateY(-1px); filter:brightness(1.05); }
+
+/* Debug console panel */
+.debug-console{
+	position:fixed;
+	right:12px;
+	bottom:62px;
+	width:360px;
+	height:260px;
+	max-width:calc(100vw - 24px);
+	max-height:60vh;
+	background:#000;
+	border:1px solid rgba(255,255,255,0.06);
+	border-radius:10px;
+	box-shadow:0 18px 60px rgba(2,6,23,0.28);
+	overflow:auto;
+	padding:8px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;
+	font-size:12px;
+	color:#7CFC00; /* test-green text */
+	z-index:20000;
+}
+.debug-console .log-entry{padding:6px;border-radius:6px;margin-bottom:6px;white-space:pre-wrap}
+.debug-console .log-entry.log{background:transparent;border:0;color:#7CFC00}
+.debug-console .log-entry.info{background:transparent;border:0;color:#9fdf9f}
+.debug-console .log-entry.warn{background:transparent;border:0;color:#ffd479}
+.debug-console .log-entry.error{background:transparent;border:0;color:#ff8b9a}
+.debug-console .console-controls{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px}
+.debug-console button.small{padding:6px 8px;border-radius:6px;border:0;background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;font-size:13px}
+.debug-console button.clear{background:#b02a37}
+
+@media (max-width:480px){
+	.debug-console{ right:8px; left:8px; width:auto; bottom:70px; height:44vh; }
+	/* slightly smaller on mobile too */
+	.debug-button{ width:26px; height:26px; font-size:12px }
+}
+
+/* While touch-dragging, disable text selection and touch gestures to avoid accidental highlights */
+.touch-dragging, .touch-dragging * {
+	-webkit-user-select: none !important;
+	-moz-user-select: none !important;
+	-ms-user-select: none !important;
+	user-select: none !important;
+	touch-action: none !important;
+}

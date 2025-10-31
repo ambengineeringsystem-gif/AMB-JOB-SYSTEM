@@ -92,147 +92,6 @@ const commentInput = document.getElementById('commentInput');
 const commentSubmit = document.getElementById('commentSubmit');
 const customFieldsContainer = document.getElementById('customFieldsContainer');
 
-/* Debug console capture: capture console calls and global errors/unhandled rejections
-   and provide an in-menu debug console UI for phones. Stored in window._debugConsole. */
-(function(){
-  const buffer = [];
-  const MAX_ENTRIES = 5000;
-  function pushEntry(level, msg){
-    try{
-      buffer.push({ ts: Date.now(), level: level, msg: String(msg) });
-      if(buffer.length > MAX_ENTRIES) buffer.splice(0, buffer.length - MAX_ENTRIES);
-    }catch(e){}
-  }
-
-  // safe stringify for objects
-  function safeStringify(v){
-    try{
-      if(typeof v === 'string') return v;
-      if(v instanceof Error) return v.stack || v.message || String(v);
-      const seen = new WeakSet();
-      return JSON.stringify(v, function(k,val){
-        if(typeof val === 'object' && val !== null){
-          if(seen.has(val)) return '[Circular]';
-          seen.add(val);
-        }
-        return val;
-      }, 2);
-    }catch(e){
-      try{ return String(v); }catch(_) { return '[unprintable]'; }
-    }
-  }
-
-  // Capture original console methods
-  const _origConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
-  ['log','info','warn','error'].forEach(fn => {
-    try{
-      console[fn] = function(...args){
-        try{
-          const txt = args.map(a => safeStringify(a)).join(' ');
-          pushEntry(fn, txt);
-        }catch(e){}
-        try{ _origConsole[fn].apply(console, args); }catch(e){}
-        // live-update UI if present
-        try{ if(window._debugConsole && typeof window._debugConsole.livePush === 'function') window._debugConsole.livePush(fn, args); }catch(e){}
-      };
-    }catch(e){}
-  });
-
-  window.addEventListener('error', function(ev){
-    try{
-      const msg = ev && ev.error ? (ev.error.stack || ev.error.message || String(ev.error)) : (ev && ev.message) || 'unknown error';
-      pushEntry('error', msg + ' @ ' + (ev && ev.filename ? (ev.filename + ':' + ev.lineno + ':' + ev.colno) : '')); 
-      if(window._debugConsole && typeof window._debugConsole.livePush === 'function') window._debugConsole.livePush('error', [msg]);
-    }catch(e){}
-  });
-
-  window.addEventListener('unhandledrejection', function(ev){
-    try{
-      const reason = ev && ev.reason ? ev.reason : 'unhandled rejection';
-      const txt = (reason && reason.stack) ? reason.stack : safeStringify(reason);
-      pushEntry('error', 'UnhandledRejection: ' + txt);
-      if(window._debugConsole && typeof window._debugConsole.livePush === 'function') window._debugConsole.livePush('error', [txt]);
-    }catch(e){}
-  });
-
-  // Expose debug console API
-  window._debugConsole = {
-    _buf: buffer,
-    entries: function(){ return buffer.slice(); },
-    clear: function(){ buffer.length = 0; const m = document.getElementById('hamburgerMenu'); if(m){ const c = m.querySelector('#debugConsole'); if(c) c.innerHTML=''; } },
-    download: function(){ try{ const txt = buffer.map(e => new Date(e.ts).toISOString() + ' ['+e.level+'] ' + e.msg).join('\n'); const blob = new Blob([txt], {type:'text/plain'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'debug-log.txt'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 3000); }catch(e){} },
-    livePush: null,
-    // render entries into a container element (menuEl)
-    renderTo: function(menuEl){
-      try{
-        if(!menuEl) return;
-        // prepare container
-        let container = menuEl.querySelector('#debugConsole');
-        if(!container){
-          container = document.createElement('div');
-          container.id = 'debugConsole';
-          container.style.maxHeight = '360px';
-          container.style.overflow = 'auto';
-          container.style.minWidth = '240px';
-          container.style.maxWidth = '420px';
-          container.style.padding = '6px';
-          container.style.marginTop = '8px';
-          container.style.borderRadius = '8px';
-          container.style.background = 'linear-gradient(180deg,#fff,#fbfdff)';
-          container.style.border = '1px solid #eef4fb';
-          menuEl.appendChild(container);
-        }
-        // populate
-        container.innerHTML = '';
-        buffer.forEach(e => {
-          const el = document.createElement('div');
-          el.className = 'dbg-entry dbg-' + (e.level || 'log');
-          el.style.padding = '6px 8px';
-          el.style.borderBottom = '1px solid rgba(2,6,23,0.03)';
-          el.style.fontFamily = 'monospace';
-          el.style.fontSize = '12px';
-          el.style.whiteSpace = 'pre-wrap';
-          el.textContent = new Date(e.ts).toLocaleTimeString() + ' [' + (e.level||'log') + '] ' + (e.msg||'');
-          container.appendChild(el);
-        });
-        container.scrollTop = container.scrollHeight;
-      }catch(e){}
-    }
-  };
-
-  // livePush will append a single entry if UI exists (keeps rendering responsive)
-  window._debugConsole.livePush = function(level, args){
-    try{
-      const menu = document.getElementById('hamburgerMenu');
-      if(!menu) return;
-      const container = menu.querySelector('#debugConsole');
-      if(!container) return;
-      const txt = args.map(a => safeStringify(a)).join(' ');
-      const el = document.createElement('div'); el.className = 'dbg-entry dbg-' + (level||'log'); el.style.padding='6px 8px'; el.style.borderBottom='1px solid rgba(2,6,23,0.03)'; el.style.fontFamily='monospace'; el.style.fontSize='12px'; el.style.whiteSpace='pre-wrap'; el.textContent = new Date().toLocaleTimeString() + ' [' + level + '] ' + txt; container.appendChild(el); container.scrollTop = container.scrollHeight; 
-    }catch(e){}
-  };
-
-  // helper to prepare a debug UI inside the menu
-  window._debugConsole.prepareMenu = function(menuEl){
-    try{
-      if(!menuEl) return;
-      menuEl.innerHTML = '';
-      const head = document.createElement('div'); head.style.display='flex'; head.style.justifyContent='space-between'; head.style.alignItems='center'; head.style.gap='8px';
-      const title = document.createElement('div'); title.textContent = 'Debug Console'; title.style.fontWeight = '700'; title.style.fontSize='14px';
-      const controls = document.createElement('div'); controls.className = 'dbg-controls'; controls.style.display='flex'; controls.style.gap='6px';
-      const clearBtn = document.createElement('button'); clearBtn.textContent='Clear'; clearBtn.onclick = function(){ window._debugConsole.clear(); window._debugConsole.renderTo(menuEl); };
-      const dlBtn = document.createElement('button'); dlBtn.textContent='Download'; dlBtn.onclick = function(){ window._debugConsole.download(); };
-      const closeBtn = document.createElement('button'); closeBtn.textContent='Close'; closeBtn.onclick = function(){ try{ menuEl.style.display = 'none'; }catch(e){} };
-      [clearBtn, dlBtn, closeBtn].forEach(b => { b.style.padding='6px 8px'; b.style.borderRadius='6px'; b.style.border='1px solid rgba(0,0,0,0.04)'; b.style.background='transparent'; b.style.cursor='pointer'; controls.appendChild(b); });
-      head.appendChild(title); head.appendChild(controls);
-      menuEl.appendChild(head);
-      // render entries container
-      window._debugConsole.renderTo(menuEl);
-    }catch(e){}
-  };
-
-})();
-
 let state = {};
 let currentUser = null; // { username }
 let userAvatarEl = null; // DOM element for the colored initial avatar
@@ -759,7 +618,11 @@ function createCardNode(card){
       touchState.timer = setTimeout(()=>{
         // permission check: ensure user can move
         try{ const users = window._USERSCache || {}; const me = (currentUser && currentUser.username) ? findUser(users, currentUser.username) : null; if(me && me.canMove === false){ clearTouchTimer(); return; } }catch(e){}
-        touchState.active = true;
+  touchState.active = true;
+  // prevent text selection and page gestures while dragging
+  try{ document.documentElement.classList.add('touch-dragging'); }catch(e){}
+  try{ el.style.userSelect = 'none'; el.style.webkitUserSelect = 'none'; el.style.touchAction = 'none'; }catch(e){}
+  try{ if(window.getSelection) { const sel = window.getSelection(); if(sel && sel.removeAllRanges) sel.removeAllRanges(); } }catch(e){}
         // mark element as dragging (reuses existing CSS)
         try{ el.setAttribute('dragging',''); }catch(e){}
         // create floating ghost clone that follows the finger
@@ -776,7 +639,7 @@ function createCardNode(card){
           try{ el.style.visibility = 'hidden'; }catch(e){}
         }catch(e){/* ignore ghost creation errors */}
       }, LONGPRESS);
-    }, { passive: true });
+  }, { passive: false });
 
     el.addEventListener('touchmove', function(ev){
       // find the touch with our id
@@ -827,6 +690,9 @@ function createCardNode(card){
         try{ el.removeAttribute('dragging'); }catch(e){}
         try{ if(touchState.ghost){ touchState.ghost.remove(); touchState.ghost = null; } }catch(e){}
         try{ el.style.visibility = ''; }catch(e){}
+        // restore selection and gestures
+        try{ document.documentElement.classList.remove('touch-dragging'); }catch(e){}
+        try{ el.style.userSelect = ''; el.style.webkitUserSelect = ''; el.style.touchAction = ''; }catch(e){}
       }
       touchState.active = false; touchState.currentDrop = null; touchState.touchId = null;
     }
@@ -2111,5 +1977,69 @@ async function applyUserColumnFilter(boardId, categories){
     return categories.filter(c => allowed.has(c));
   }catch(err){ return categories; }
 }
+
+// --- Debug console (mobile-friendly) ---------------------------------
+// Captures console output and displays it in an in-page panel toggled by the small button.
+(function installDebugConsole(){
+  try{
+    const dbgBtn = document.getElementById('debugButton');
+    const dbgConsole = document.getElementById('debugConsole');
+    if(!dbgBtn || !dbgConsole) return;
+
+    // Build header controls
+    const header = document.createElement('div'); header.className = 'console-controls';
+    const title = document.createElement('div'); title.textContent = 'Debug Log';
+    const actions = document.createElement('div');
+    const clearBtn = document.createElement('button'); clearBtn.className = 'small clear'; clearBtn.textContent = 'Clear';
+    const closeBtn = document.createElement('button'); closeBtn.className = 'small'; closeBtn.textContent = 'Close';
+    actions.appendChild(clearBtn); actions.appendChild(closeBtn);
+    header.appendChild(title); header.appendChild(actions);
+    dbgConsole.appendChild(header);
+
+    clearBtn.addEventListener('click', ()=>{
+      const entries = dbgConsole.querySelectorAll('.log-entry'); entries.forEach(e=>e.remove());
+    });
+    closeBtn.addEventListener('click', ()=>{ dbgConsole.style.display = 'none'; dbgConsole.setAttribute('aria-hidden','true'); });
+
+    function append(type, args){
+      try{
+        const el = document.createElement('div'); el.className = 'log-entry ' + (type || 'log');
+        const time = new Date().toLocaleTimeString();
+        const parts = Array.prototype.map.call(args, a => {
+          try{ if(typeof a === 'string') return a; return JSON.stringify(a); }catch(e){ return String(a); }
+        });
+        el.textContent = `[${time}] ${parts.join(' ')}`;
+        dbgConsole.appendChild(el);
+        dbgConsole.scrollTop = dbgConsole.scrollHeight;
+      }catch(e){}
+    }
+
+    // Toggle panel visibility
+    dbgBtn.addEventListener('click', ()=>{
+      const show = dbgConsole.style.display !== 'block';
+      dbgConsole.style.display = show ? 'block' : 'none';
+      dbgConsole.setAttribute('aria-hidden', (!show).toString());
+      if(show) dbgConsole.scrollTop = dbgConsole.scrollHeight;
+    });
+
+    // Intercept core console methods
+    const orig = {};
+    ['log','info','warn','error','debug'].forEach(k => {
+      try{
+        orig[k] = console[k] && console[k].bind(console);
+        console[k] = function(){
+          try{ if(orig[k]) orig[k].apply(console, arguments); }catch(e){}
+          try{ append(k, Array.from(arguments)); }catch(e){}
+        };
+      }catch(e){}
+    });
+
+    window.addEventListener('error', ev => { append('error', [ev.message, ev.filename + ':' + ev.lineno + ':' + ev.colno]); });
+    window.addEventListener('unhandledrejection', ev => { append('error', ['UnhandledRejection', ev.reason]); });
+
+    // Expose small API
+    window._DEBUG_CONSOLE = { append: append, show: ()=>{ dbgConsole.style.display='block'; dbgConsole.setAttribute('aria-hidden','false'); }, hide: ()=>{ dbgConsole.style.display='none'; dbgConsole.setAttribute('aria-hidden','true'); } };
+  }catch(e){ console.warn('installDebugConsole failed', e); }
+})();
 
 

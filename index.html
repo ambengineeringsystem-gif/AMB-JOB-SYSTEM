@@ -3,14 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#2b7cff" />
   <title>Job Board - Kanban</title>
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" href="icons/icon.svg" />
-  <!-- iOS / Apple touch icon and web-app capabilities -->
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="stylesheet" href="style.css" />
   <style>
     /* Page background using AMB-BG.png with a subtle light overlay for readability */
@@ -50,7 +43,6 @@
  
             <div style="margin-top:6px;"><button id="menuAdmin" onclick="(function(){try{const raw=localStorage.getItem('kanban_current_user');const cu=raw?JSON.parse(raw):null;if(cu&&cu.username==='admin'){window.open('admin/index.html','_blank');}else{const a=document.getElementById('adminAuthModal');if(a){document.getElementById('adminAuthUser')&&(document.getElementById('adminAuthUser').value='');document.getElementById('adminAuthPass')&&(document.getElementById('adminAuthPass').value='');document.getElementById('adminAuthError')&&(document.getElementById('adminAuthError').style.display='none');a.style.display='flex';}else{window.location.href='admin/index.html';}}}catch(e){try{window.location.href='admin/index.html';}catch(_){} } finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">ADMIN</button></div>
             <div style="margin-top:6px;"><button id="menuLogin" onclick="(function(){try{const lm=document.getElementById('loginModal');if(lm){lm.style.display='flex';}document.getElementById('loginUser')&&(document.getElementById('loginUser').value='');document.getElementById('loginPass')&&(document.getElementById('loginPass').value='');document.getElementById('loginError')&&(document.getElementById('loginError').style.display='none');}catch(e){} finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">Login</button></div>
-            <div style="margin-top:6px;"><button id="menuInstall" style="display:none">Install</button></div>
             <div style="margin-top:6px;"><button id="menuLogout" onclick="(function(){try{if(!localStorage.getItem('kanban_current_user')){alert('Not signed in');return;}localStorage.removeItem('kanban_current_user');try{location.reload();}catch(e){alert('Signed out');}}catch(e){} finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">Logout</button></div>
         </div>
       </div>
@@ -334,94 +326,6 @@
         const cu = raw ? JSON.parse(raw) : null;
         btn.style.display = (cu && cu.username === 'admin') ? '' : 'none';
       }catch(e){ btn.style.display = 'none'; }
-    })();
-  </script>
-  <script>
-    // Register the service worker (if supported)
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(reg) {
-          console.log('Service worker registered.', reg);
-        }).catch(function(err) {
-          console.warn('Service worker registration failed:', err);
-        });
-      });
-    }
-
-    // Enhanced PWA install handling: show Install button in hamburger menu when available
-    (function(){
-      const installBtn = document.getElementById('menuInstall');
-      // Utility: detect iOS Safari (no beforeinstallprompt event)
-      const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-      const isInStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator.standalone === true);
-
-      function showInstallBtn(show){
-        if(!installBtn) return;
-        installBtn.style.display = show ? '' : 'none';
-      }
-
-      // If already installed/standalone, don't show the button
-      if(isInStandalone){ showInstallBtn(false); }
-
-      // Capture beforeinstallprompt for Chromium-based browsers (Android/desktop)
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        window.deferredInstallPrompt = e; // stash for later
-        // Show the install button in the menu
-        showInstallBtn(true);
-        console.log('beforeinstallprompt captured; install button shown.');
-      });
-
-      // If running on iOS (Safari), show an instruction-based install button
-      if(isIos && !isInStandalone){
-        // Show a button that opens a short instruction for adding to home screen
-        showInstallBtn(true);
-      }
-
-      // Additionally, show the install button proactively on mobile / touch devices
-      // so users can tap it even if `beforeinstallprompt` hasn't fired.
-      const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
-      const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
-      const isMobile = isTouch || isMobileUA;
-      if(isMobile && !isInStandalone){
-        showInstallBtn(true);
-      }
-
-      // Click handler for the menu install button
-      if(installBtn){
-        installBtn.addEventListener('click', async function(ev){
-          try{
-            // Close hamburger menu if open
-            try{ document.getElementById('hamburgerMenu') && (document.getElementById('hamburgerMenu').style.display = 'none'); }catch(e){}
-
-            if(window.deferredInstallPrompt){
-              // Preferred flow: show the browser install prompt
-              window.deferredInstallPrompt.prompt();
-              const choice = await window.deferredInstallPrompt.userChoice;
-              console.log('User choice result:', choice);
-              // clear the saved prompt and hide the button
-              window.deferredInstallPrompt = null;
-              showInstallBtn(false);
-            } else if(isIos){
-              // iOS: cannot prompt programmatically. Show simple instructions.
-              // On iPhone/iPad instruct the user to use Safari's "Share -> Add to Home Screen"
-              const message = 'To install this app on iOS: tap Share → "Add to Home Screen" and follow the prompts.';
-              try{ alert(message); }catch(e){ console.log(message); }
-            } else {
-              // Fallback: try to open install via a progressive check
-              try{
-                alert('Install is not available in this browser. Use the browser menu to install or open this page in Chrome on Android.');
-              }catch(e){ console.log('Install not available'); }
-            }
-          }catch(err){ console.warn('Install handler error', err); }
-        });
-      }
-
-      // Hide install button when the app is installed
-      window.addEventListener('appinstalled', (evt) => {
-        console.log('App installed', evt);
-        showInstallBtn(false);
-      });
     })();
   </script>
 </body>

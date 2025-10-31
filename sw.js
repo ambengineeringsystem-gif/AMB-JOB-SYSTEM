@@ -10,6 +10,8 @@ const ASSETS_TO_CACHE = [
   '/users.js',
   '/manifest.json',
   '/icons/icon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
   '/admin/index.html',
   '/admin/system_toggle.html'
 ];

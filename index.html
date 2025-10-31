@@ -7,6 +7,10 @@
   <title>Job Board - Kanban</title>
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" href="icons/icon.svg" />
+  <!-- iOS / Apple touch icon and web-app capabilities -->
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="stylesheet" href="style.css" />
   <style>
     /* Page background using AMB-BG.png with a subtle light overlay for readability */
@@ -371,6 +375,15 @@
       // If running on iOS (Safari), show an instruction-based install button
       if(isIos && !isInStandalone){
         // Show a button that opens a short instruction for adding to home screen
+        showInstallBtn(true);
+      }
+
+      // Additionally, show the install button proactively on mobile / touch devices
+      // so users can tap it even if `beforeinstallprompt` hasn't fired.
+      const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+      const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+      const isMobile = isTouch || isMobileUA;
+      if(isMobile && !isInStandalone){
         showInstallBtn(true);
       }
 

@@ -46,6 +46,7 @@
  
             <div style="margin-top:6px;"><button id="menuAdmin" onclick="(function(){try{const raw=localStorage.getItem('kanban_current_user');const cu=raw?JSON.parse(raw):null;if(cu&&cu.username==='admin'){window.open('admin/index.html','_blank');}else{const a=document.getElementById('adminAuthModal');if(a){document.getElementById('adminAuthUser')&&(document.getElementById('adminAuthUser').value='');document.getElementById('adminAuthPass')&&(document.getElementById('adminAuthPass').value='');document.getElementById('adminAuthError')&&(document.getElementById('adminAuthError').style.display='none');a.style.display='flex';}else{window.location.href='admin/index.html';}}}catch(e){try{window.location.href='admin/index.html';}catch(_){} } finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">ADMIN</button></div>
             <div style="margin-top:6px;"><button id="menuLogin" onclick="(function(){try{const lm=document.getElementById('loginModal');if(lm){lm.style.display='flex';}document.getElementById('loginUser')&&(document.getElementById('loginUser').value='');document.getElementById('loginPass')&&(document.getElementById('loginPass').value='');document.getElementById('loginError')&&(document.getElementById('loginError').style.display='none');}catch(e){} finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">Login</button></div>
+            <div style="margin-top:6px;"><button id="menuInstall" style="display:none">Install</button></div>
             <div style="margin-top:6px;"><button id="menuLogout" onclick="(function(){try{if(!localStorage.getItem('kanban_current_user')){alert('Not signed in');return;}localStorage.removeItem('kanban_current_user');try{location.reload();}catch(e){alert('Signed out');}}catch(e){} finally{try{document.getElementById('hamburgerMenu')&&(document.getElementById('hamburgerMenu').style.display='none')}catch(e){}} })();">Logout</button></div>
         </div>
       </div>
@@ -343,16 +344,72 @@
       });
     }
 
-    // Optional: capture beforeinstallprompt to show a custom install UI later
-    window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      // Stash the event so it can be triggered later
-      window.deferredInstallPrompt = e;
-      // You could show an install button in the UI and call:
-      // window.deferredInstallPrompt.prompt();
-      console.log('beforeinstallprompt captured; use window.deferredInstallPrompt.prompt() to show it.');
-    });
+    // Enhanced PWA install handling: show Install button in hamburger menu when available
+    (function(){
+      const installBtn = document.getElementById('menuInstall');
+      // Utility: detect iOS Safari (no beforeinstallprompt event)
+      const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+      const isInStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator.standalone === true);
+
+      function showInstallBtn(show){
+        if(!installBtn) return;
+        installBtn.style.display = show ? '' : 'none';
+      }
+
+      // If already installed/standalone, don't show the button
+      if(isInStandalone){ showInstallBtn(false); }
+
+      // Capture beforeinstallprompt for Chromium-based browsers (Android/desktop)
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredInstallPrompt = e; // stash for later
+        // Show the install button in the menu
+        showInstallBtn(true);
+        console.log('beforeinstallprompt captured; install button shown.');
+      });
+
+      // If running on iOS (Safari), show an instruction-based install button
+      if(isIos && !isInStandalone){
+        // Show a button that opens a short instruction for adding to home screen
+        showInstallBtn(true);
+      }
+
+      // Click handler for the menu install button
+      if(installBtn){
+        installBtn.addEventListener('click', async function(ev){
+          try{
+            // Close hamburger menu if open
+            try{ document.getElementById('hamburgerMenu') && (document.getElementById('hamburgerMenu').style.display = 'none'); }catch(e){}
+
+            if(window.deferredInstallPrompt){
+              // Preferred flow: show the browser install prompt
+              window.deferredInstallPrompt.prompt();
+              const choice = await window.deferredInstallPrompt.userChoice;
+              console.log('User choice result:', choice);
+              // clear the saved prompt and hide the button
+              window.deferredInstallPrompt = null;
+              showInstallBtn(false);
+            } else if(isIos){
+              // iOS: cannot prompt programmatically. Show simple instructions.
+              // On iPhone/iPad instruct the user to use Safari's "Share -> Add to Home Screen"
+              const message = 'To install this app on iOS: tap Share → "Add to Home Screen" and follow the prompts.';
+              try{ alert(message); }catch(e){ console.log(message); }
+            } else {
+              // Fallback: try to open install via a progressive check
+              try{
+                alert('Install is not available in this browser. Use the browser menu to install or open this page in Chrome on Android.');
+              }catch(e){ console.log('Install not available'); }
+            }
+          }catch(err){ console.warn('Install handler error', err); }
+        });
+      }
+
+      // Hide install button when the app is installed
+      window.addEventListener('appinstalled', (evt) => {
+        console.log('App installed', evt);
+        showInstallBtn(false);
+      });
+    })();
   </script>
 </body>
 </html>
